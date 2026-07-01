@@ -1,10 +1,10 @@
 # frozen_string_literal: true
 
-require_relative "lib/ruby_esi/version"
+require_relative "lib/esirb/version"
 
 Gem::Specification.new do |spec|
-  spec.name = "ruby_esi"
-  spec.version = RubyEsi::VERSION
+  spec.name = "esirb"
+  spec.version = Esirb::VERSION
   spec.authors = ["sicks"]
   spec.email = ["tcopeland@dg3n.net"]
 

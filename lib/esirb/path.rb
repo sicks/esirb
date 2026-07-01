@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-module RubyEsi
+module Esirb
   class Path
     attr_reader :client, :string
 

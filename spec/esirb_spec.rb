@@ -1,8 +1,8 @@
 # frozen_string_literal: true
 
-RSpec.describe RubyEsi do
+RSpec.describe Esirb do
   it "has a version number" do
-    expect(RubyEsi::VERSION).not_to be nil
+    expect(Esirb::VERSION).not_to be nil
   end
 
   it "does something useful" do

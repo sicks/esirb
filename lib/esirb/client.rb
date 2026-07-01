@@ -3,7 +3,7 @@
 require "faraday"
 require "faraday-http-cache"
 
-module RubyEsi
+module Esirb
   class Client
     BASE_URL = "https://esi.evetech.net"
     DEFAULT_HEADERS = {
