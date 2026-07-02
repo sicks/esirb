@@ -32,7 +32,7 @@ client = Esirb::Client.new(token: "...")
 
 ### Build the path, with any path parameters
 
-Treat ESI static paths as method names, and path parameters as the arguments for those methods. Chain these methods to build the path to the desired ESI endpoint. Then call your HTTP verb with whatever parameters or header overrides.
+Treat ESI static paths as method names, and path parameters as the arguments for those methods. Chain these methods to build the path to the desired ESI endpoint.
 
 ```ruby
 
