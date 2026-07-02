@@ -1,7 +1,9 @@
 PATH
   remote: .
   specs:
-    esirb (0.1.0)
+    esirb (0.2.1)
+      faraday (~> 2.14)
+      faraday-http-cache (~> 2.7)
 
 GEM
   remote: https://rubygems.org/
@@ -91,13 +93,13 @@ PLATFORMS
   x86_64-linux
 
 DEPENDENCIES
+  esirb!
   faraday (~> 2.14)
   faraday-http-cache (~> 2.7)
   irb
   rake (~> 13.0)
   rspec (~> 3.0)
   rubocop (~> 1.21)
-  esirb!
 
 BUNDLED WITH
-   2.6.9
+  4.0.15
