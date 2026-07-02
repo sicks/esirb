@@ -10,8 +10,12 @@ module Esirb
     end
 
     %i[get head delete trace post put patch].each do |verb|
-      define_method verb do |params = {}, headers = {}|
-        client.connection.send(verb, @string, params, headers)
+      define_method verb do |**args|
+        client.connection.send(verb, @string) do |req|
+          req.params = args[:params] if args[:params]
+          req.body = args[:body] if args[:body]
+          req.headers = args[:headers] if args[:headers]
+        end
       end
     end
 
