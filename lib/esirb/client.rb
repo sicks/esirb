@@ -15,14 +15,15 @@ module Esirb
       "X-Compatibility-Date" => "2026-06-09"
     }
 
-    attr_reader :token, :path, :tenant, :language, :cache, :cache_store
+    attr_reader :token, :path, :tenant, :language, :cache, :cache_store, :raise_errors
 
-    def initialize(token: nil, tenant: "tranquility", language: "en", cache: true, cache_store: nil)
+    def initialize(token: nil, tenant: "tranquility", language: "en", cache: true, cache_store: nil, raise_errors: true)
       @token = token
       @tenant = tenant
       @language = language
       @cache = cache
       @cache_store = cache_store
+      @raise_errors = raise_errors
     end
 
     def connection
@@ -38,6 +39,7 @@ module Esirb
 
         c.request :json
         c.headers = DEFAULT_HEADERS
+        c.response :raise_error if raise_errors
         c.response :json, content_type: "application/json"
       end
     end
