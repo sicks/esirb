@@ -13,7 +13,7 @@ module Esirb
       "If-None-Match" => "",
       "X-Tenant" => "tranquility",
       "X-Compatibility-Date" => "2026-06-09"
-    }
+    }.freeze
 
     attr_reader :token, :path, :tenant, :language, :cache, :cache_store, :raise_errors
 
@@ -28,17 +28,17 @@ module Esirb
 
     def connection
       @connection ||= Faraday.new(BASE_URL) do |c|
-        c.request :authorization, "Bearer", token if token
-
         if cache
-          c.use :http_cache,
-            store: cache_store,
-            strategy: Faraday::HttpCache::Strategies::ByUrl,
-            serializer: Marshal
+          c.use :http_cache, store: cache_store, strategy: Faraday::HttpCache::Strategies::ByUrl, serializer: Marshal
         end
 
-        c.request :json
         c.headers = DEFAULT_HEADERS
+        c.headers["X-Tenant"] = tenant if tenant
+        c.headers["Accept-Language"] = language if language
+
+        c.request :authorization, "Bearer", token if token
+        c.request :json
+
         c.response :raise_error if raise_errors
         c.response :json, content_type: "application/json"
       end
