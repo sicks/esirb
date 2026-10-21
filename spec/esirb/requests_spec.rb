@@ -11,6 +11,20 @@ RSpec.describe "Requests sent to ESI" do
 
       expect(requests.first.url.to_s).to eq "https://esi.evetech.net/characters/123/location"
     end
+
+    it "sends encoded path params without encoding them twice" do
+      requests = stub_endpoint(stubs, :get, "/killmails/1/a%2Fb")
+      client.killmails(1, "a/b").get
+
+      expect(requests.first.url.path).to eq "/killmails/1/a%2Fb"
+    end
+
+    it "requests hyphenated segments" do
+      requests = stub_endpoint(stubs, :get, "/characters/1/freelance-jobs")
+      client.characters(1).freelance_jobs.get
+
+      expect(requests.first.url.path).to eq "/characters/1/freelance-jobs"
+    end
   end
 
   describe "headers" do
@@ -74,6 +88,13 @@ RSpec.describe "Requests sent to ESI" do
 
       expect(requests.first.request_headers["Content-Type"]).to eq "application/json"
       expect(requests.first.request_body).to eq "[95465499,30000142]"
+    end
+
+    it "sends a false body instead of dropping it" do
+      requests = stub_endpoint(stubs, :put, "/characters/1/settings")
+      client.characters(1).settings.put(body: false)
+
+      expect(requests.first.request_body).to eq "false"
     end
   end
 

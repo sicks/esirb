@@ -45,8 +45,19 @@ module Esirb
       end
     end
 
-    def method_missing(name, *)
-      @path = Path.new(client: self).send(name, *)
+    # Starts a path with a segment exactly as given, for segments that can't be reached by method name.
+    def segment(name, *params)
+      Path.new(client: self).segment(name, *params)
+    end
+
+    def method_missing(name, *, **)
+      return super unless Path.segment_name?(name)
+
+      @path = Path.new(client: self).public_send(name, *, **)
+    end
+
+    def respond_to_missing?(name, include_private = false)
+      Path.segment_name?(name) || super
     end
   end
 end

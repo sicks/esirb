@@ -1,32 +1,92 @@
 # frozen_string_literal: true
 
+require "erb"
+
 module Esirb
   # An ESI endpoint path built by chaining method calls, sent with an HTTP verb method.
+  #
+  # Every call returns a new Path, so a partial path can be reused:
+  #
+  #   character = client.characters(123)
+  #   character.location.string # => "/characters/123/location"
+  #   character.skills.string   # => "/characters/123/skills"
   class Path
-    attr_reader :client, :string
+    VERBS = %i[get head delete post put patch].freeze
 
-    def initialize(client: nil)
-      @client = client
-      @string = ""
+    # Method names that become path segments. Conversion hooks like to_ary and to_str are left to Ruby.
+    SEGMENT_NAME = /\A(?!to_)[a-z][a-z0-9_]*\z/
+    SEGMENT_TYPES = [String, Symbol, Integer].freeze
+
+    # ESI segments with hyphens, which can't be Ruby method names. Calling the underscored name
+    # (client.freelance_jobs) sends the hyphenated segment. `rake esi:check_segments` compares
+    # this list with ESI's OpenAPI spec.
+    HYPHENATED_SEGMENTS = %w[
+      access-lists
+      compatibility-dates
+      freelance-jobs
+      mercenary-dens
+      mercenary-tactical-operations
+      sovereignty-hubs
+    ].to_h { |segment| [segment.tr("-", "_"), segment] }.freeze
+
+    NO_BODY = Object.new.freeze
+    private_constant :NO_BODY
+
+    def self.segment_name?(name)
+      SEGMENT_NAME.match?(name.to_s)
     end
 
-    %i[get head delete trace post put patch].each do |verb|
-      define_method verb do |**args|
-        client.connection.send(verb, @string) do |req|
-          req.params = args[:params] if args[:params]
-          req.body = args[:body] if args[:body]
-          req.headers = args[:headers] if args[:headers]
+    attr_reader :client, :string
+
+    def initialize(client:, segments: [])
+      raise ArgumentError, "client is required" if client.nil?
+
+      @client = client
+      @segments = segments.freeze
+      @string = segments.map { |segment| "/#{segment}" }.join.freeze
+      freeze
+    end
+
+    VERBS.each do |verb|
+      define_method verb do |params: nil, body: NO_BODY, headers: nil|
+        client.connection.public_send(verb, string) do |req|
+          req.params = params if params
+          req.body = body unless body.equal?(NO_BODY)
+          req.headers = headers if headers
         end
       end
     end
 
-    def method_missing(name, *args)
-      @string += "/#{name}"
-      args.each do |arg|
-        @string += "/#{arg}"
+    # Adds a segment and its path params to a copy of this path, exactly as given. Use it for
+    # segments that can't be reached by method name.
+    def segment(name, *params)
+      self.class.new(client:, segments: @segments + [name, *params].map { |value| encode(value) })
+    end
+
+    def method_missing(name, *params, **kwargs)
+      return super unless self.class.segment_name?(name)
+      if kwargs.any?
+        raise ArgumentError, "path segments only take positional params; pass query params to the HTTP verb as params:"
       end
 
-      self
+      segment(HYPHENATED_SEGMENTS.fetch(name.to_s, name), *params)
+    end
+
+    def respond_to_missing?(name, include_private = false)
+      self.class.segment_name?(name) || super
+    end
+
+    private
+
+    def encode(value)
+      unless SEGMENT_TYPES.any? { |type| value.is_a?(type) }
+        raise ArgumentError, "path segments must be strings, symbols or integers, got #{value.inspect}"
+      end
+
+      text = value.to_s
+      raise ArgumentError, "path segments can't be #{text.inspect}" if ["", ".", ".."].include?(text)
+
+      ERB::Util.url_encode(text)
     end
   end
 end
