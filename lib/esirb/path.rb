@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 module Esirb
+  # An ESI endpoint path built by chaining method calls, sent with an HTTP verb method.
   class Path
     attr_reader :client, :string
 
@@ -19,8 +20,8 @@ module Esirb
       end
     end
 
-    def method_missing(m, *args, &block)
-      @string += "/#{m}"
+    def method_missing(name, *args)
+      @string += "/#{name}"
       args.each do |arg|
         @string += "/#{arg}"
       end

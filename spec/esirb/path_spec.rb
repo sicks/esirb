@@ -13,19 +13,19 @@ RSpec.describe Esirb::Path do
     end
 
     context "with path.characters(123456789)" do
-      before { path.characters(123456789) }
+      before { path.characters(123_456_789) }
 
       it { is_expected.to eq "/characters/123456789" }
     end
 
     context "with path.characters(123456789).locations" do
-      before { path.characters(123456789).locations }
+      before { path.characters(123_456_789).locations }
 
       it { is_expected.to eq "/characters/123456789/locations" }
     end
 
     context "with path.route(123456789, 987654321)" do
-      before { path.route(123456789, 987654321) }
+      before { path.route(123_456_789, 987_654_321) }
 
       it { is_expected.to eq "/route/123456789/987654321" }
     end
