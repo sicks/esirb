@@ -54,5 +54,32 @@ RSpec.describe Esirb::Client do
     specify "are called on a new Path" do
       expect(client.frank).to be_a Esirb::Path
     end
+
+    it "start a fresh path each time" do
+      client.alliances
+
+      expect(client.corporations.string).to eq "/corporations"
+    end
+
+    it "reports segment names in respond_to?" do
+      expect(client).to respond_to(:alliances)
+      expect(client).not_to respond_to(:to_ary)
+    end
+
+    it "leave other method names to Ruby" do
+      expect { client.to_str }.to raise_error(NoMethodError)
+    end
+  end
+
+  describe "#segment" do
+    it "starts a path with a segment exactly as given" do
+      expect(client.segment("new-thing", 7).string).to eq "/new-thing/7"
+    end
+  end
+
+  describe "hyphenated ESI segments" do
+    it "are reached with the underscored method name" do
+      expect(client.freelance_jobs(7).string).to eq "/freelance-jobs/7"
+    end
   end
 end
