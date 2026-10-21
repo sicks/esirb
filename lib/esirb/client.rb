@@ -4,6 +4,7 @@ require "faraday"
 require "faraday-http-cache"
 
 module Esirb
+  # Holds the ESI connection settings and starts building request paths.
   class Client
     BASE_URL = "https://esi.evetech.net"
     DEFAULT_HEADERS = {
@@ -44,8 +45,8 @@ module Esirb
       end
     end
 
-    def method_missing(m, *args, &block)
-      @path = Path.new(client: self).send(m.to_sym, *args)
+    def method_missing(name, *)
+      @path = Path.new(client: self).send(name, *)
     end
   end
 end

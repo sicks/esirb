@@ -11,7 +11,7 @@ Gem::Specification.new do |spec|
   spec.summary = "Ruby interface for Eve Online's Swagger API"
   spec.homepage = "https://github.com/sicks/esirb"
   spec.license = "MIT"
-  spec.required_ruby_version = ">= 3.1.0"
+  spec.required_ruby_version = ">= 3.3.0"
 
   spec.metadata["allowed_push_host"] = "https://rubygems.org"
 
