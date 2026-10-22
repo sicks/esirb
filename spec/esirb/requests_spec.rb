@@ -12,6 +12,17 @@ RSpec.describe "Requests sent to ESI" do
       expect(requests.first.url.to_s).to eq "https://esi.evetech.net/characters/123/location"
     end
 
+    context "with a base_url" do
+      let(:client) { Esirb::Client.new(cache: false, base_url: "https://esi.example.test") }
+
+      it "requests that host instead" do
+        requests = stub_endpoint(stubs, :get, "/status")
+        client.status.get
+
+        expect(requests.first.url.to_s).to eq "https://esi.example.test/status"
+      end
+    end
+
     it "sends encoded path params without encoding them twice" do
       requests = stub_endpoint(stubs, :get, "/killmails/1/a%2Fb")
       client.killmails(1, "a/b").get
@@ -38,18 +49,34 @@ RSpec.describe "Requests sent to ESI" do
         "Accept" => "application/json",
         "Accept-Language" => "en",
         "X-Tenant" => "tranquility",
-        "X-Compatibility-Date" => "2026-06-09"
+        "X-Compatibility-Date" => "2026-08-18"
       )
     end
 
-    context "with tenant and language options" do
-      let(:client) { Esirb::Client.new(cache: false, tenant: "singularity", language: "de") }
+    context "with tenant, language and compatibility_date options" do
+      let(:client) do
+        Esirb::Client.new(cache: false, tenant: "singularity", language: "de", compatibility_date: "2026-06-09")
+      end
 
       it "sends them in place of the defaults" do
         requests
         client.status.get
 
-        expect(requests.first.request_headers).to include("X-Tenant" => "singularity", "Accept-Language" => "de")
+        expect(requests.first.request_headers).to include(
+          "X-Tenant" => "singularity", "Accept-Language" => "de", "X-Compatibility-Date" => "2026-06-09"
+        )
+      end
+    end
+
+    context "with nil tenant, language and compatibility_date" do
+      let(:client) { Esirb::Client.new(cache: false, tenant: nil, language: nil, compatibility_date: nil) }
+
+      it "leaves those headers out" do
+        requests
+        client.status.get
+
+        expect(requests.first.request_headers.keys)
+          .not_to include("X-Tenant", "Accept-Language", "X-Compatibility-Date")
       end
     end
 

@@ -50,6 +50,12 @@ RSpec.describe Esirb::Client do
     end
   end
 
+  describe "options" do
+    it "rejects unknown options" do
+      expect { described_class.new(tennant: "singularity") }.to raise_error(ArgumentError, /tennant/)
+    end
+  end
+
   describe "missing methods" do
     specify "are called on a new Path" do
       expect(client.frank).to be_a Esirb::Path

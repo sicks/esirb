@@ -18,14 +18,18 @@ module Esirb
     SEGMENT_TYPES = [String, Symbol, Integer].freeze
 
     # ESI segments with hyphens, which can't be Ruby method names. Calling the underscored name
-    # (client.freelance_jobs) sends the hyphenated segment. `rake esi:check_segments` compares
-    # this list with ESI's OpenAPI spec.
+    # (client.freelance_jobs) sends the hyphenated segment. Segments keep their spelling across
+    # compatibility dates, so this covers every date. `rake esi:check_segments` compares it with
+    # ESI's OpenAPI spec for each date.
     HYPHENATED_SEGMENTS = %w[
       access-lists
       compatibility-dates
       freelance-jobs
       mercenary-dens
       mercenary-tactical-operations
+      military-campaigns
+      paragon-hub
+      recommended-fit
       sovereignty-hubs
     ].to_h { |segment| [segment.tr("-", "_"), segment] }.freeze
 

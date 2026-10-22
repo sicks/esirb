@@ -13,6 +13,8 @@ RSpec.configure do |config|
 
   config.include EsiStubs
 
+  config.after { Esirb.reset_configuration! }
+
   config.expect_with :rspec do |c|
     c.syntax = :expect
   end

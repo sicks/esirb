@@ -38,6 +38,30 @@ client = Esirb::Client.new(user_agent: "mappy/1.2 (admin@example.com)")
 client.user_agent # => "mappy/1.2 (admin@example.com) esirb/0.3.0 (+https://github.com/sicks/esirb)"
 ```
 
+### Configuration
+
+Set defaults for every new client once, for example in a Rails initializer:
+
+```ruby
+Esirb.configure do |config|
+  config.user_agent = "mappy/1.2 (admin@example.com)"
+  config.compatibility_date = "2026-08-18"
+end
+```
+
+Options passed to `Esirb::Client.new` override these for that client:
+
+| Option | Default | Notes |
+|---|---|---|
+| `base_url` | `"https://esi.evetech.net"` | |
+| `compatibility_date` | `"2026-08-18"` | Sent as `X-Compatibility-Date`. A newer date can change response shapes, so check your code against it before switching. |
+| `tenant` | `"tranquility"` | Sent as `X-Tenant`. |
+| `language` | `"en"` | Sent as `Accept-Language`. |
+| `user_agent` | `nil` | Your app's name and contact info, sent before esirb's own User-Agent. |
+| `raise_errors` | `true` | Raise on error statuses instead of returning the response. |
+
+Setting `tenant`, `language` or `compatibility_date` to `nil` leaves that header out. `token`, `cache` and `cache_store` are set per client only.
+
 ### Build the path, with any path parameters
 
 Treat ESI static paths as method names, and path parameters as the arguments for those methods. Chain these methods to build the path to the desired ESI endpoint.

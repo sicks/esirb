@@ -1,19 +1,6 @@
 # Offenses left in place on purpose because other ESIrb tickets rework this code.
 # Remove each entry when its ticket lands.
 
-# MP-211 (configurable values) and MP-215 (Faraday customization) replace these options and the connection setup.
-Metrics/ParameterLists:
-  Exclude:
-    - "lib/esirb/client.rb"
-
-Metrics/AbcSize:
-  Exclude:
-    - "lib/esirb/client.rb"
-
-Metrics/MethodLength:
-  Exclude:
-    - "lib/esirb/client.rb"
-
 # MP-224 decides on rubygems_mfa_required along with the other gemspec cleanup.
 Gemspec/RequireMFA:
   Exclude:
