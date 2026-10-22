@@ -2,6 +2,7 @@
 
 require "faraday"
 require "faraday-http-cache"
+require_relative "version"
 
 module Esirb
   # Holds the ESI connection settings and starts building request paths.
@@ -10,16 +11,20 @@ module Esirb
     DEFAULT_HEADERS = {
       "Accept" => "application/json",
       "Accept-Language" => "en",
-      "If-Modified-Since" => "",
-      "If-None-Match" => "",
       "X-Tenant" => "tranquility",
       "X-Compatibility-Date" => "2026-06-09"
     }.freeze
+    # Sent after the app's own user_agent, so ESI can tell which library made the request.
+    USER_AGENT = "esirb/#{VERSION} (+https://github.com/sicks/esirb)".freeze
 
-    attr_reader :token, :path, :tenant, :language, :cache, :cache_store, :raise_errors
+    attr_reader :token, :path, :tenant, :language, :cache, :cache_store, :raise_errors, :user_agent
 
-    def initialize(token: nil, tenant: "tranquility", language: "en", cache: true, cache_store: nil, raise_errors: true)
+    # user_agent: your app's name, version and contact info, e.g. "mappy/1.2 (admin@example.com)".
+    # CCP asks every ESI client to identify itself this way. esirb adds its own name after it.
+    def initialize(token: nil, tenant: "tranquility", language: "en", cache: true, cache_store: nil,
+                   raise_errors: true, user_agent: nil)
       @token = token
+      @user_agent = user_agent.to_s.strip.empty? ? USER_AGENT : "#{user_agent.strip} #{USER_AGENT}"
       @tenant = tenant
       @language = language
       @cache = cache
@@ -36,6 +41,7 @@ module Esirb
         c.headers = DEFAULT_HEADERS
         c.headers["X-Tenant"] = tenant if tenant
         c.headers["Accept-Language"] = language if language
+        c.headers["User-Agent"] = user_agent
 
         c.request :authorization, "Bearer", token if token
         c.request :json
