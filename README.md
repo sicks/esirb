@@ -46,6 +46,7 @@ Set defaults for every new client once, for example in a Rails initializer:
 Esirb.configure do |config|
   config.user_agent = "mappy/1.2 (admin@example.com)"
   config.compatibility_date = "2026-08-18"
+  config.cache_store = Rails.cache
 end
 ```
 
@@ -59,8 +60,28 @@ Options passed to `Esirb::Client.new` override these for that client:
 | `language` | `"en"` | Sent as `Accept-Language`. |
 | `user_agent` | `nil` | Your app's name and contact info, sent before esirb's own User-Agent. |
 | `raise_errors` | `true` | Raise on error statuses instead of returning the response. |
+| `cache_store` | `nil` | Where to cache responses. `nil` turns caching off; see [Caching](#caching). |
 
-Setting `tenant`, `language` or `compatibility_date` to `nil` leaves that header out. `token`, `cache` and `cache_store` are set per client only.
+Setting `tenant`, `language` or `compatibility_date` to `nil` leaves that header out. `token` is set per client only.
+
+### Caching
+
+esirb caches responses only when you give it a `cache_store`, usually once in `Esirb.configure` so every client shares it. Any object with `read`, `write` and `delete` works, such as `Rails.cache` or another `ActiveSupport::Cache` store.
+
+```ruby
+Esirb.configure do |config|
+  config.cache_store = ActiveSupport::Cache::RedisCacheStore.new(url: ENV["REDIS_URL"], namespace: "esirb", expires_in: 1.day)
+end
+
+Esirb::Client.new(cache_store: nil) # no caching for this client
+```
+
+Use a store that expires entries. Cache keys include the access token, and tokens change about every 20 minutes, so entries for old tokens are never read again. A store without expiry, including `Faraday::HttpCache::MemoryStore`, keeps them forever.
+
+esirb follows ESI's cache headers:
+
+- Responses are kept separate per URL, tenant, language, compatibility date and access token, so a shared store never serves one character's data to another.
+- Authenticated responses are cached too. ESI marks them `private, max-age=5, must-revalidate`, so they're reused for 5 seconds and then revalidated, which returns a cheap `304 Not Modified` when nothing has changed.
 
 ### Build the path, with any path parameters
 
