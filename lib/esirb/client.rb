@@ -4,6 +4,7 @@ require "faraday"
 require "faraday-http-cache"
 require_relative "version"
 require_relative "configuration"
+require_relative "vary_by_authorization"
 
 module Esirb
   # Holds the ESI connection settings and starts building request paths.
@@ -29,13 +30,11 @@ module Esirb
 
     def connection
       @connection ||= Faraday.new(base_url) do |c|
-        if cache
-          c.use :http_cache, store: cache_store, strategy: Faraday::HttpCache::Strategies::ByUrl, serializer: Marshal
-        end
-
+        # Before the cache, so the token is part of each cache key.
+        c.request :authorization, "Bearer", token if token
+        use_cache(c) if cache
         c.headers.update(default_headers)
 
-        c.request :authorization, "Bearer", token if token
         c.request :json
 
         c.response :raise_error if raise_errors
@@ -59,6 +58,14 @@ module Esirb
     end
 
     private
+
+    # Keys cache entries on the URL plus the headers in Vary: tenant, language, compatibility date
+    # and, through VaryByAuthorization, the token.
+    def use_cache(builder)
+      builder.use :http_cache, store: cache_store, strategy: Faraday::HttpCache::Strategies::ByVary,
+                               serializer: Marshal
+      builder.use VaryByAuthorization
+    end
 
     def apply_settings(settings)
       @base_url = settings[:base_url]
