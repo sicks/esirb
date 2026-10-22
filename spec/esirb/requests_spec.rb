@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
 RSpec.describe "Requests sent to ESI" do
-  let(:client) { Esirb::Client.new(cache: false) }
+  let(:client) { Esirb::Client.new }
   let(:stubs) { stub_esi(client) }
 
   describe "URL" do
@@ -13,7 +13,7 @@ RSpec.describe "Requests sent to ESI" do
     end
 
     context "with a base_url" do
-      let(:client) { Esirb::Client.new(cache: false, base_url: "https://esi.example.test") }
+      let(:client) { Esirb::Client.new(base_url: "https://esi.example.test") }
 
       it "requests that host instead" do
         requests = stub_endpoint(stubs, :get, "/status")
@@ -55,7 +55,7 @@ RSpec.describe "Requests sent to ESI" do
 
     context "with tenant, language and compatibility_date options" do
       let(:client) do
-        Esirb::Client.new(cache: false, tenant: "singularity", language: "de", compatibility_date: "2026-06-09")
+        Esirb::Client.new(tenant: "singularity", language: "de", compatibility_date: "2026-06-09")
       end
 
       it "sends them in place of the defaults" do
@@ -69,7 +69,7 @@ RSpec.describe "Requests sent to ESI" do
     end
 
     context "with nil tenant, language and compatibility_date" do
-      let(:client) { Esirb::Client.new(cache: false, tenant: nil, language: nil, compatibility_date: nil) }
+      let(:client) { Esirb::Client.new(tenant: nil, language: nil, compatibility_date: nil) }
 
       it "leaves those headers out" do
         requests
@@ -109,7 +109,7 @@ RSpec.describe "Requests sent to ESI" do
     end
 
     context "with a user_agent" do
-      let(:client) { Esirb::Client.new(cache: false, user_agent: "mappy/1.2 (admin@example.com)") }
+      let(:client) { Esirb::Client.new(user_agent: "mappy/1.2 (admin@example.com)") }
 
       it "sends the app's User-Agent followed by esirb's" do
         requests
@@ -121,7 +121,7 @@ RSpec.describe "Requests sent to ESI" do
     end
 
     context "with a blank user_agent" do
-      let(:client) { Esirb::Client.new(cache: false, user_agent: "  ") }
+      let(:client) { Esirb::Client.new(user_agent: "  ") }
 
       it "sends esirb's User-Agent alone" do
         requests
@@ -139,7 +139,7 @@ RSpec.describe "Requests sent to ESI" do
     end
 
     context "with a token" do
-      let(:client) { Esirb::Client.new(cache: false, token: "abc123") }
+      let(:client) { Esirb::Client.new(token: "abc123") }
 
       it "sends it as a bearer token" do
         requests
@@ -205,7 +205,7 @@ RSpec.describe "Requests sent to ESI" do
     end
 
     context "with raise_errors: false" do
-      let(:client) { Esirb::Client.new(cache: false, raise_errors: false) }
+      let(:client) { Esirb::Client.new(raise_errors: false) }
 
       it "returns error responses" do
         stub_endpoint(stubs, :get, "/characters/1", response: json_response({ error: "not found" }, status: 404))
@@ -220,17 +220,101 @@ RSpec.describe "Requests sent to ESI" do
     let(:cacheable) { json_response({ players: 1 }, headers: { "Cache-Control" => "public, max-age=60" }) }
 
     context "with a cache store" do
-      let(:client) { Esirb::Client.new(cache_store: Faraday::HttpCache::MemoryStore.new) }
+      let(:store) { Faraday::HttpCache::MemoryStore.new }
+      let(:client) { Esirb::Client.new(cache_store: store) }
 
-      it "serves repeat requests from the cache" do
+      it "serves repeat requests from the cache, parsed" do
         requests = stub_endpoint(stubs, :get, "/status", response: cacheable)
-        2.times { client.status.get }
+        client.status.get
 
-        expect(requests.size).to eq 1
+        expect([client.status.get.body, requests.size]).to eq [{ "players" => 1 }, 1]
+      end
+
+      it "stores the raw body as JSON rather than Marshal data" do
+        stub_endpoint(stubs, :get, "/status", response: cacheable)
+        client.status.get
+        # ByVary also writes an index entry holding the Vary header names; this picks the response.
+        entry = store.instance_variable_get(:@cache).values.find { |value| value.start_with?("{") }
+
+        expect(JSON.parse(entry)["body"]).to eq '{"players":1}'
       end
     end
 
-    context "with cache: false" do
+    context "with a cache store set in Esirb.configure" do
+      before { Esirb.configure { |config| config.cache_store = Faraday::HttpCache::MemoryStore.new } }
+
+      it "shares the cache between new clients" do
+        first = Esirb::Client.new
+        second = Esirb::Client.new
+        stub_endpoint(stub_esi(first), :get, "/status", response: cacheable)
+        requests = stub_endpoint(stub_esi(second), :get, "/status", response: cacheable)
+        first.status.get
+        second.status.get
+
+        expect(requests).to be_empty
+      end
+    end
+
+    context "with private responses" do
+      let(:store) { Faraday::HttpCache::MemoryStore.new }
+      # What ESI sends for authenticated endpoints.
+      let(:private_headers) do
+        { "Cache-Control" => "private, max-age=5, must-revalidate, stale-if-error=900",
+          "Vary" => "X-Tenant, Accept-Language, X-Compatibility-Date" }
+      end
+
+      def private_client(owner, **options)
+        client = Esirb::Client.new(cache_store: store, **options)
+        response = json_response({ owner: }, headers: private_headers)
+        [client, stub_endpoint(stub_esi(client), :get, "/characters/1/location", response:)]
+      end
+
+      it "serves them from the cache to the same token" do
+        first, = private_client("alice", token: "alice")
+        second, requests = private_client("alice", token: "alice")
+        first.characters(1).location.get
+        second.characters(1).location.get
+
+        expect(requests).to be_empty
+      end
+
+      it "doesn't serve them to another token" do
+        alice, = private_client("alice", token: "alice")
+        bob, = private_client("bob", token: "bob")
+        alice.characters(1).location.get
+
+        expect(bob.characters(1).location.get.body).to eq("owner" => "bob")
+      end
+
+      it "doesn't serve them to a client without a token" do
+        alice, = private_client("alice", token: "alice")
+        anonymous, = private_client("anonymous")
+        alice.characters(1).location.get
+
+        expect(anonymous.characters(1).location.get.body).to eq("owner" => "anonymous")
+      end
+    end
+
+    context "with a stale entry" do
+      let(:client) { Esirb::Client.new(cache_store: Faraday::HttpCache::MemoryStore.new, token: "alice") }
+
+      it "revalidates with the ETag and serves the cached body on a 304", :aggregate_failures do
+        conditional = []
+        stubs.get("/characters/1/location") do |env|
+          conditional << env.request_headers["If-None-Match"]
+          next [304, { "ETag" => '"v1"' }, ""] if env.request_headers["If-None-Match"]
+
+          json_response({ solar_system_id: 30_000_142 },
+                        headers: { "Cache-Control" => "private, max-age=0, must-revalidate", "ETag" => '"v1"' })
+        end
+        client.characters(1).location.get
+
+        expect(client.characters(1).location.get.body).to eq("solar_system_id" => 30_000_142)
+        expect(conditional).to eq [nil, '"v1"']
+      end
+    end
+
+    context "without a cache store" do
       it "sends every request" do
         requests = stub_endpoint(stubs, :get, "/status", response: cacheable)
         2.times { client.status.get }

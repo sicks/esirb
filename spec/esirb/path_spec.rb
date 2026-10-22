@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
 RSpec.describe Esirb::Path do
-  let(:client) { Esirb::Client.new(cache: false) }
+  let(:client) { Esirb::Client.new }
   let(:path) { described_class.new(client:) }
 
   describe "building paths from method calls" do

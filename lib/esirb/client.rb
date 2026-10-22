@@ -12,19 +12,17 @@ module Esirb
     # Sent after the app's own user_agent, so ESI can tell which library made the request.
     USER_AGENT = "esirb/#{VERSION} (+https://github.com/sicks/esirb)".freeze
 
-    attr_reader :token, :path, :base_url, :compatibility_date, :tenant, :language, :cache, :cache_store,
+    attr_reader :token, :path, :base_url, :compatibility_date, :tenant, :language, :cache_store,
                 :raise_errors, :user_agent
 
     # Options not given here come from Esirb.configuration: base_url, compatibility_date, tenant,
-    # language, user_agent and raise_errors. A nil tenant, language or compatibility_date leaves
-    # that header out.
-    def initialize(token: nil, cache: true, cache_store: nil, **options)
+    # language, user_agent, raise_errors and cache_store. A nil tenant, language or
+    # compatibility_date leaves that header out, and a nil cache_store turns caching off.
+    def initialize(token: nil, **options)
       unknown = options.keys - Configuration::DEFAULTS.keys
       raise ArgumentError, "unknown option#{"s" if unknown.size > 1}: #{unknown.join(", ")}" if unknown.any?
 
       @token = token
-      @cache = cache
-      @cache_store = cache_store
       apply_settings(Esirb.configuration.to_h.merge(options))
     end
 
@@ -32,13 +30,14 @@ module Esirb
       @connection ||= Faraday.new(base_url) do |c|
         # Before the cache, so the token is part of each cache key.
         c.request :authorization, "Bearer", token if token
-        use_cache(c) if cache
         c.headers.update(default_headers)
-
-        c.request :json
 
         c.response :raise_error if raise_errors
         c.response :json, content_type: "application/json"
+        # Inside the JSON parser, so the cache stores raw response bodies.
+        use_cache(c) if cache_store
+
+        c.request :json
       end
     end
 
@@ -60,10 +59,11 @@ module Esirb
     private
 
     # Keys cache entries on the URL plus the headers in Vary: tenant, language, compatibility date
-    # and, through VaryByAuthorization, the token.
+    # and, through VaryByAuthorization, the token. Because every entry is per token, the store
+    # acts as a private cache and keeps ESI's `Cache-Control: private` responses too.
     def use_cache(builder)
       builder.use :http_cache, store: cache_store, strategy: Faraday::HttpCache::Strategies::ByVary,
-                               serializer: Marshal
+                               shared_cache: false
       builder.use VaryByAuthorization
     end
 
@@ -73,6 +73,7 @@ module Esirb
       @tenant = settings[:tenant]
       @language = settings[:language]
       @raise_errors = settings[:raise_errors]
+      @cache_store = settings[:cache_store]
       app_user_agent = settings[:user_agent].to_s.strip
       @user_agent = app_user_agent.empty? ? USER_AGENT : "#{app_user_agent} #{USER_AGENT}"
     end

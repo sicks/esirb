@@ -16,8 +16,8 @@ RSpec.describe Esirb::Client do
       expect(client.connection.builder.handlers).to include Faraday::Response::Json
     end
 
-    it "includes http cache middleware" do
-      expect(client.connection.builder.handlers).to include Faraday::HttpCache
+    it "does not include http cache middleware without a cache store" do
+      expect(client.connection.builder.handlers).not_to include Faraday::HttpCache
     end
 
     it "includes error response middleware" do
@@ -41,11 +41,23 @@ RSpec.describe Esirb::Client do
       end
     end
 
-    context "with cache false" do
-      let(:client) { described_class.new(cache: false) }
+    context "with a cache store" do
+      let(:client) { described_class.new(cache_store: Faraday::HttpCache::MemoryStore.new) }
 
-      it "does not include http cache middleware" do
-        expect(client.connection.builder.handlers).not_to include Faraday::HttpCache
+      it "includes http cache middleware" do
+        expect(client.connection.builder.handlers).to include Faraday::HttpCache
+      end
+    end
+
+    context "with a configured cache store" do
+      before { Esirb.configure { |config| config.cache_store = Faraday::HttpCache::MemoryStore.new } }
+
+      it "includes http cache middleware" do
+        expect(client.connection.builder.handlers).to include Faraday::HttpCache
+      end
+
+      it "can be turned off for one client with cache_store: nil" do
+        expect(described_class.new(cache_store: nil).connection.builder.handlers).not_to include Faraday::HttpCache
       end
     end
   end
