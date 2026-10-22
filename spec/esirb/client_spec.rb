@@ -67,7 +67,7 @@ RSpec.describe Esirb::Client do
       expect(client.corporations.string).to eq "/corporations"
     end
 
-    it "reports segment names in respond_to?" do
+    it "reports segment names in respond_to?", :aggregate_failures do
       expect(client).to respond_to(:alliances)
       expect(client).not_to respond_to(:to_ary)
     end

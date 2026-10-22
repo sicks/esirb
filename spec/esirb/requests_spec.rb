@@ -158,7 +158,7 @@ RSpec.describe "Requests sent to ESI" do
       expect(requests.first.params).to eq("type_id" => "34", "page" => "2")
     end
 
-    it "keeps params alongside headers and a body" do
+    it "keeps params alongside headers and a body", :aggregate_failures do
       requests = stub_endpoint(stubs, :post, "/characters/1/contacts")
       client.characters(1).contacts.post(params: { standing: 5.0 }, body: [2], headers: { "X-Custom" => "1" })
 
@@ -169,7 +169,7 @@ RSpec.describe "Requests sent to ESI" do
   end
 
   describe "request body" do
-    it "encodes the body as JSON" do
+    it "encodes the body as JSON", :aggregate_failures do
       requests = stub_endpoint(stubs, :post, "/universe/names")
       client.universe.names.post(body: [95_465_499, 30_000_142])
 

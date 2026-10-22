@@ -17,7 +17,7 @@ RSpec.describe Esirb::Configuration do
   end
 
   describe "Esirb.configure" do
-    it "changes the defaults for new clients" do
+    it "changes the defaults for new clients", :aggregate_failures do
       Esirb.configure do |config|
         config.base_url = "https://esi.example.test"
         config.compatibility_date = "2026-06-09"
