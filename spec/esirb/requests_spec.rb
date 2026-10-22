@@ -238,26 +238,71 @@ RSpec.describe "Requests sent to ESI" do
         expect(requests.size).to eq 2
       end
     end
+
+    context "with a store shared between clients" do
+      let(:store) { Faraday::HttpCache::MemoryStore.new }
+      # The Vary header ESI sends, including its repeated Accept-Language.
+      let(:esi_cache_headers) do
+        { "Cache-Control" => "public, max-age=60",
+          "Vary" => "X-Tenant, Accept-Language, X-Compatibility-Date, Accept-Language" }
+      end
+
+      # Builds a client on the shared store. Its wallet endpoint answers with `owner` and records requests.
+      def cached_client(owner, **options)
+        client = Esirb::Client.new(cache_store: store, **options)
+        response = json_response({ owner: }, headers: esi_cache_headers)
+        [client, stub_endpoint(stub_esi(client), :get, "/characters/1/wallet", response:)]
+      end
+
+      it "doesn't serve one token's response to another token" do
+        alice, = cached_client("alice", token: "alice")
+        bob, = cached_client("bob", token: "bob")
+        alice.characters(1).wallet.get
+
+        expect(bob.characters(1).wallet.get.body).to eq("owner" => "bob")
+      end
+
+      it "shares responses between clients with the same token" do
+        first, = cached_client("alice", token: "alice")
+        second, requests = cached_client("alice", token: "alice")
+        first.characters(1).wallet.get
+        second.characters(1).wallet.get
+
+        expect(requests).to be_empty
+      end
+
+      it "doesn't serve a token's response to a client without one" do
+        alice, = cached_client("alice", token: "alice")
+        anonymous, = cached_client("anonymous")
+        alice.characters(1).wallet.get
+
+        expect(anonymous.characters(1).wallet.get.body).to eq("owner" => "anonymous")
+      end
+
+      { language: %w[en de], tenant: %w[tranquility singularity], compatibility_date: %w[2026-08-18 2026-06-09] }
+        .each do |option, (first_value, second_value)|
+        it "keeps separate entries for each #{option}" do
+          first, = cached_client(first_value, option => first_value)
+          second, = cached_client(second_value, option => second_value)
+          first.characters(1).wallet.get
+
+          expect(second.characters(1).wallet.get.body).to eq("owner" => second_value)
+        end
+      end
+
+      it "keeps separate entries for a per-request Accept-Language" do
+        client, requests = cached_client("alice")
+        client.characters(1).wallet.get
+        client.characters(1).wallet.get(headers: { "Accept-Language" => "fr" })
+
+        expect(requests.size).to eq 2
+      end
+    end
   end
 
   # Confirmed bugs from the ESIrb project. Each example fails today, so RSpec reports it as pending.
   # When a fix makes one pass, RSpec fails it and asks for `pending` to be removed.
   describe "known bugs" do
-    it "does not share cached responses between tokens (MP-208)" do
-      pending "MP-208: the cache is keyed by URL only"
-      store = Faraday::HttpCache::MemoryStore.new
-      alice = Esirb::Client.new(token: "alice", cache_store: store)
-      bob = Esirb::Client.new(token: "bob", cache_store: store)
-      [alice, bob].each do |c|
-        stub_endpoint(stub_esi(c), :get, "/characters/1/wallet", response: json_response(
-          { owner: c.token }, headers: { "Cache-Control" => "public, max-age=60" }
-        ))
-      end
-      alice.characters(1).wallet.get
-
-      expect(bob.characters(1).wallet.get.body).to eq("owner" => "bob")
-    end
-
     it "raises an Esirb::Error for error statuses (MP-220)" do
       pending "MP-220: Faraday errors are raised as-is"
       stub_endpoint(stubs, :get, "/status", response: json_response({ error: "limited" }, status: 420))

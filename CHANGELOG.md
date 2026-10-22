@@ -15,6 +15,10 @@
 - `Esirb::Path.new` requires a client.
 - `Esirb::Client.new` raises `ArgumentError` on unknown options.
 
+### Fixed
+
+- A cache store shared between clients could serve one token's response to another, or a response in the wrong language, tenant or compatibility date. Cache entries are now keyed on the URL plus ESI's `Vary` headers and the token. Entries written by older versions aren't read, so the cache starts empty after upgrading.
+
 ### Added
 
 - `Esirb.configure` sets defaults for new clients: `base_url`, `compatibility_date`, `tenant`, `language`, `user_agent` and `raise_errors`. Each can also be passed to `Esirb::Client.new`.
