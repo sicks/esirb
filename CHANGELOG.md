@@ -3,6 +3,9 @@
 ### Changed
 
 - Requires Ruby 3.3 or newer.
+- Headers and params passed to an HTTP verb are merged with the defaults instead of replacing them. A per-request header replaces a default with the same name.
+- Requests no longer send empty `If-Modified-Since` and `If-None-Match` headers.
+- The User-Agent is `esirb/<version> (+https://github.com/sicks/esirb)` instead of Faraday's.
 - Each chained call returns a new, frozen `Esirb::Path`, so a partial path can be reused without changing it.
 - Path params are URL-encoded. `nil`, blank, `.`, `..` and anything other than a string, symbol or integer raise `ArgumentError`.
 - Keyword arguments in a path (`client.markets(1, type_id: 34)`) raise `ArgumentError`. Pass query params to the HTTP verb with `params:`.
@@ -12,6 +15,7 @@
 
 ### Added
 
+- `user_agent:` client option for your app's name and contact info, sent before esirb's own User-Agent.
 - Hyphenated ESI segments can be called with underscores: `client.characters(1).freelance_jobs` requests `/characters/1/freelance-jobs`. Only ESI's known hyphenated segments are converted.
 - `#segment` on clients and paths adds a segment exactly as given, for segments esirb can't reach by method name.
 - `rake esi:check_segments` compares esirb's list of hyphenated segments with ESI's OpenAPI spec.

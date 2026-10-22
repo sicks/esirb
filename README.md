@@ -30,6 +30,14 @@ client = Esirb::Client.new
 client = Esirb::Client.new(token: "...")
 ```
 
+##### Identify your app
+CCP asks every ESI client to send a User-Agent with the app's name and a way to contact you. Pass yours as `user_agent:`, and esirb adds its own name after it:
+
+```ruby
+client = Esirb::Client.new(user_agent: "mappy/1.2 (admin@example.com)")
+client.user_agent # => "mappy/1.2 (admin@example.com) esirb/0.3.0 (+https://github.com/sicks/esirb)"
+```
+
 ### Build the path, with any path parameters
 
 Treat ESI static paths as method names, and path parameters as the arguments for those methods. Chain these methods to build the path to the desired ESI endpoint.
@@ -80,6 +88,8 @@ resp.body # => { "solar_system_id": 30000142 }
 # check ESI documentation to know whether you need to pass query parameters, or a body
 resp = path.post(params:, body:, headers:)
 ```
+
+Headers passed to a verb are added to the client's default headers, and replace a default with the same name.
 
 ### All together now
 ```ruby
