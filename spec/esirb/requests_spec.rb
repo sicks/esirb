@@ -53,6 +53,57 @@ RSpec.describe "Requests sent to ESI" do
       end
     end
 
+    it "does not send empty conditional headers" do
+      requests
+      client.status.get
+
+      expect(requests.first.request_headers.keys).not_to include("If-Modified-Since", "If-None-Match")
+    end
+
+    it "keeps the defaults when per-request headers are passed" do
+      requests
+      client.status.get(headers: { "X-Custom" => "1" })
+
+      expect(requests.first.request_headers).to include("X-Custom" => "1", "X-Tenant" => "tranquility")
+    end
+
+    it "lets per-request headers override a default, whatever their case" do
+      requests
+      client.status.get(headers: { "accept-language" => "fr" })
+
+      expect(requests.first.request_headers["Accept-Language"]).to eq "fr"
+    end
+
+    it "identifies esirb in the User-Agent" do
+      requests
+      client.status.get
+
+      expect(requests.first.request_headers["User-Agent"]).to eq "esirb/#{Esirb::VERSION} (+https://github.com/sicks/esirb)"
+    end
+
+    context "with a user_agent" do
+      let(:client) { Esirb::Client.new(cache: false, user_agent: "mappy/1.2 (admin@example.com)") }
+
+      it "sends the app's User-Agent followed by esirb's" do
+        requests
+        client.status.get
+
+        expect(requests.first.request_headers["User-Agent"])
+          .to eq "mappy/1.2 (admin@example.com) #{Esirb::Client::USER_AGENT}"
+      end
+    end
+
+    context "with a blank user_agent" do
+      let(:client) { Esirb::Client.new(cache: false, user_agent: "  ") }
+
+      it "sends esirb's User-Agent alone" do
+        requests
+        client.status.get
+
+        expect(requests.first.request_headers["User-Agent"]).to eq Esirb::Client::USER_AGENT
+      end
+    end
+
     it "sends no Authorization header without a token" do
       requests
       client.status.get
@@ -78,6 +129,15 @@ RSpec.describe "Requests sent to ESI" do
       client.markets(10_000_002).orders.get(params: { type_id: 34, page: 2 })
 
       expect(requests.first.params).to eq("type_id" => "34", "page" => "2")
+    end
+
+    it "keeps params alongside headers and a body" do
+      requests = stub_endpoint(stubs, :post, "/characters/1/contacts")
+      client.characters(1).contacts.post(params: { standing: 5.0 }, body: [2], headers: { "X-Custom" => "1" })
+
+      expect(requests.first.params).to eq("standing" => "5.0")
+      expect(requests.first.request_headers).to include("X-Custom" => "1", "X-Tenant" => "tranquility")
+      expect(requests.first.request_body).to eq "[2]"
     end
   end
 
@@ -156,30 +216,6 @@ RSpec.describe "Requests sent to ESI" do
   # Confirmed bugs from the ESIrb project. Each example fails today, so RSpec reports it as pending.
   # When a fix makes one pass, RSpec fails it and asks for `pending` to be removed.
   describe "known bugs" do
-    it "keeps the default headers when per-request headers are passed (MP-207)" do
-      pending "MP-207: per-request headers replace the defaults"
-      requests = stub_endpoint(stubs, :get, "/status")
-      client.status.get(headers: { "X-Custom" => "1" })
-
-      expect(requests.first.request_headers).to include("X-Custom" => "1", "X-Tenant" => "tranquility")
-    end
-
-    it "does not send empty conditional headers (MP-209)" do
-      pending "MP-209: empty If-Modified-Since / If-None-Match are sent"
-      requests = stub_endpoint(stubs, :get, "/status")
-      client.status.get
-
-      expect(requests.first.request_headers.keys).not_to include("If-Modified-Since", "If-None-Match")
-    end
-
-    it "identifies itself in the User-Agent (MP-210)" do
-      pending "MP-210: User-Agent is Faraday's default"
-      requests = stub_endpoint(stubs, :get, "/status")
-      client.status.get
-
-      expect(requests.first.request_headers["User-Agent"]).to start_with "esirb/"
-    end
-
     it "does not share cached responses between tokens (MP-208)" do
       pending "MP-208: the cache is keyed by URL only"
       store = Faraday::HttpCache::MemoryStore.new

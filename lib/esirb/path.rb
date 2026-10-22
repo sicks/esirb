@@ -50,9 +50,9 @@ module Esirb
     VERBS.each do |verb|
       define_method verb do |params: nil, body: NO_BODY, headers: nil|
         client.connection.public_send(verb, string) do |req|
-          req.params = params if params
+          req.params.update(params) if params
           req.body = body unless body.equal?(NO_BODY)
-          req.headers = headers if headers
+          req.headers.update(headers) if headers
         end
       end
     end
