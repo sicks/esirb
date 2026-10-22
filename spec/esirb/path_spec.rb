@@ -48,7 +48,7 @@ RSpec.describe Esirb::Path do
         .to eq ["/characters/1/location", "/characters/1/skills"]
     end
 
-    it "is frozen" do
+    it "is frozen", :aggregate_failures do
       expect(character).to be_frozen
       expect(character.string).to be_frozen
     end
@@ -93,26 +93,26 @@ RSpec.describe Esirb::Path do
         .to eq "/characters/1/new-thing/5/freelance_jobs"
     end
 
-    it "encodes and validates like method calls" do
+    it "encodes and validates like method calls", :aggregate_failures do
       expect(path.segment("a b").string).to eq "/a%20b"
       expect { path.segment(nil) }.to raise_error(ArgumentError)
     end
   end
 
   describe "method names that aren't segments" do
-    it "leaves conversion hooks to Ruby" do
+    it "leaves conversion hooks to Ruby", :aggregate_failures do
       alliances = path.alliances
 
       expect([alliances].flatten).to eq [alliances]
       expect { path.to_str }.to raise_error(NoMethodError)
     end
 
-    it "rejects names that can't be ESI segments" do
+    it "rejects names that can't be ESI segments", :aggregate_failures do
       expect { path.alliances? }.to raise_error(NoMethodError)
       expect { path.Alliances }.to raise_error(NoMethodError)
     end
 
-    it "reports segment names in respond_to?" do
+    it "reports segment names in respond_to?", :aggregate_failures do
       expect(path).to respond_to(:alliances)
       expect(path).not_to respond_to(:to_ary)
       expect(path).not_to respond_to(:alliances?)
