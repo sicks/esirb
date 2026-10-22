@@ -1,5 +1,9 @@
 inherit_from: .rubocop_todo.yml
 
+plugins:
+  - rubocop-rake
+  - rubocop-rspec
+
 AllCops:
   TargetRubyVersion: 3.3
   NewCops: enable
@@ -13,3 +17,12 @@ Style/StringLiteralsInInterpolation:
 Metrics/BlockLength:
   Exclude:
     - "spec/**/*"
+
+# Examples with several expectations are tagged :aggregate_failures instead.
+RSpec/ExampleLength:
+  Max: 12
+
+# Describes request behavior across Client and Path, not a single class.
+RSpec/DescribeClass:
+  Exclude:
+    - "spec/esirb/requests_spec.rb"
