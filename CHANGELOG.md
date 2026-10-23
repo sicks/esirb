@@ -14,6 +14,7 @@
 - HTTP verbs raise `ArgumentError` on unknown options, and a `false` body is sent instead of dropped.
 - `Esirb::Path.new` requires a client.
 - `Esirb::Client.new` raises `ArgumentError` on unknown options.
+- A client builds its Faraday connection when it's created instead of on first use, and keeps no state from building paths, so one client can be shared between threads.
 - Responses are cached only when a `cache_store` is set, in `Esirb.configure` or per client. Before, every client cached in its own unbounded in-memory store by default.
 - The cache stores raw response bodies as JSON instead of Marshal data.
 - Errors are esirb's own classes instead of Faraday's: error statuses raise `Esirb::ResponseError` subclasses, and connection failures and timeouts raise `Esirb::ConnectionFailed` and `Esirb::TimeoutError`, with the Faraday error as the `cause`. Code that rescues `Faraday::Error` needs to rescue `Esirb::Error` instead.
@@ -37,6 +38,7 @@
 
 ### Removed
 
+- `Esirb::Client#path`, which held the last path built. `client.path` is now an ordinary `/path` segment.
 - The `raise_errors:` client option. Error statuses always raise; rescue the `Esirb::ResponseError` subclass when a status is expected, and use `e.response`, `e.status` or `e.body` to inspect it.
 - The `cache:` client option. Pass `cache_store: nil` to turn caching off for one client.
 - `Esirb::Client::BASE_URL` and `Esirb::Client::DEFAULT_HEADERS`. Use `Esirb.configuration` or the client's readers (`base_url`, `compatibility_date`, ...).
