@@ -25,6 +25,8 @@ gem install esirb
 ```ruby
 client = Esirb::Client.new
 ```
+
+A client holds no state from building paths or making requests, so one client can be shared between threads.
 ##### Create a client with a token
 ```ruby
 client = Esirb::Client.new(token: "...")

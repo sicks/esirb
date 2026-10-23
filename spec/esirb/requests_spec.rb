@@ -174,6 +174,16 @@ RSpec.describe "Requests sent to ESI" do
     end
   end
 
+  describe "sharing a client between threads" do
+    it "sends each thread's own request" do
+      requests = stub_endpoint(stubs, :get, %r{\A/characters/\d+/location\z})
+      10.times.map { |id| Thread.new { client.characters(id).location.get } }.each(&:join)
+
+      expect(requests.map { |request| request.url.path })
+        .to match_array(10.times.map { |id| "/characters/#{id}/location" })
+    end
+  end
+
   describe "query params" do
     it "sends params as the query string" do
       requests = stub_endpoint(stubs, :get, "/markets/10000002/orders")
