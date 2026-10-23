@@ -4,6 +4,7 @@ require "faraday"
 require "faraday-http-cache"
 require_relative "version"
 require_relative "configuration"
+require_relative "raise_error"
 require_relative "vary_by_authorization"
 
 module Esirb
@@ -12,11 +13,10 @@ module Esirb
     # Sent after the app's own user_agent, so ESI can tell which library made the request.
     USER_AGENT = "esirb/#{VERSION} (+https://github.com/sicks/esirb)".freeze
 
-    attr_reader :token, :path, :base_url, :compatibility_date, :tenant, :language, :cache_store,
-                :raise_errors, :user_agent
+    attr_reader :token, :path, :base_url, :compatibility_date, :tenant, :language, :cache_store, :user_agent
 
     # Options not given here come from Esirb.configuration: base_url, compatibility_date, tenant,
-    # language, user_agent, raise_errors and cache_store. A nil tenant, language or
+    # language, user_agent and cache_store. A nil tenant, language or
     # compatibility_date leaves that header out, and a nil cache_store turns caching off.
     def initialize(token: nil, **options)
       unknown = options.keys - Configuration::DEFAULTS.keys
@@ -32,7 +32,7 @@ module Esirb
         c.request :authorization, "Bearer", token if token
         c.headers.update(default_headers)
 
-        c.response :raise_error if raise_errors
+        c.use RaiseError
         c.response :json, content_type: "application/json"
         # Inside the JSON parser, so the cache stores raw response bodies.
         use_cache(c) if cache_store
@@ -72,7 +72,6 @@ module Esirb
       @compatibility_date = settings[:compatibility_date]
       @tenant = settings[:tenant]
       @language = settings[:language]
-      @raise_errors = settings[:raise_errors]
       @cache_store = settings[:cache_store]
       app_user_agent = settings[:user_agent].to_s.strip
       @user_agent = app_user_agent.empty? ? USER_AGENT : "#{app_user_agent} #{USER_AGENT}"

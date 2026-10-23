@@ -38,51 +38,6 @@ client = Esirb::Client.new(user_agent: "mappy/1.2 (admin@example.com)")
 client.user_agent # => "mappy/1.2 (admin@example.com) esirb/0.3.0 (+https://github.com/sicks/esirb)"
 ```
 
-### Configuration
-
-Set defaults for every new client once, for example in a Rails initializer:
-
-```ruby
-Esirb.configure do |config|
-  config.user_agent = "mappy/1.2 (admin@example.com)"
-  config.compatibility_date = "2026-08-18"
-  config.cache_store = Rails.cache
-end
-```
-
-Options passed to `Esirb::Client.new` override these for that client:
-
-| Option | Default | Notes |
-|---|---|---|
-| `base_url` | `"https://esi.evetech.net"` | |
-| `compatibility_date` | `"2026-08-18"` | Sent as `X-Compatibility-Date`. A newer date can change response shapes, so check your code against it before switching. |
-| `tenant` | `"tranquility"` | Sent as `X-Tenant`. |
-| `language` | `"en"` | Sent as `Accept-Language`. |
-| `user_agent` | `nil` | Your app's name and contact info, sent before esirb's own User-Agent. |
-| `raise_errors` | `true` | Raise on error statuses instead of returning the response. |
-| `cache_store` | `nil` | Where to cache responses. `nil` turns caching off; see [Caching](#caching). |
-
-Setting `tenant`, `language` or `compatibility_date` to `nil` leaves that header out. `token` is set per client only.
-
-### Caching
-
-esirb caches responses only when you give it a `cache_store`, usually once in `Esirb.configure` so every client shares it. Any object with `read`, `write` and `delete` works, such as `Rails.cache` or another `ActiveSupport::Cache` store.
-
-```ruby
-Esirb.configure do |config|
-  config.cache_store = ActiveSupport::Cache::RedisCacheStore.new(url: ENV["REDIS_URL"], namespace: "esirb", expires_in: 1.day)
-end
-
-Esirb::Client.new(cache_store: nil) # no caching for this client
-```
-
-Use a store that expires entries. Cache keys include the access token, and tokens change about every 20 minutes, so entries for old tokens are never read again. A store without expiry, including `Faraday::HttpCache::MemoryStore`, keeps them forever.
-
-esirb follows ESI's cache headers:
-
-- Responses are kept separate per URL, tenant, language, compatibility date and access token, so a shared store never serves one character's data to another.
-- Authenticated responses are cached too. ESI marks them `private, max-age=5, must-revalidate`, so they're reused for 5 seconds and then revalidated, which returns a cheap `304 Not Modified` when nothing has changed.
-
 ### Build the path, with any path parameters
 
 Treat ESI static paths as method names, and path parameters as the arguments for those methods. Chain these methods to build the path to the desired ESI endpoint.
@@ -140,6 +95,87 @@ Headers passed to a verb are added to the client's default headers, and replace 
 ```ruby
 client = Esirb::Client.new
 list_of_alliance_ids = client.alliances.get.body # => [...]
+```
+
+### Configuration
+
+Set defaults for every new client once, for example in a Rails initializer:
+
+```ruby
+Esirb.configure do |config|
+  config.user_agent = "mappy/1.2 (admin@example.com)"
+  config.compatibility_date = "2026-08-18"
+  config.cache_store = Rails.cache
+end
+```
+
+Options passed to `Esirb::Client.new` override these for that client:
+
+| Option | Default | Notes |
+|---|---|---|
+| `base_url` | `"https://esi.evetech.net"` | |
+| `compatibility_date` | `"2026-08-18"` | Sent as `X-Compatibility-Date`. A newer date can change response shapes, so check your code against it before switching. |
+| `tenant` | `"tranquility"` | Sent as `X-Tenant`. |
+| `language` | `"en"` | Sent as `Accept-Language`. |
+| `user_agent` | `nil` | Your app's name and contact info, sent before esirb's own User-Agent. |
+| `cache_store` | `nil` | Where to cache responses. `nil` turns caching off; see [Caching](#caching). |
+
+Setting `tenant`, `language` or `compatibility_date` to `nil` leaves that header out. `token` is set per client only.
+
+### Caching
+
+esirb caches responses only when you give it a `cache_store`, usually once in `Esirb.configure` so every client shares it. Any object with `read`, `write` and `delete` works, such as `Rails.cache` or another `ActiveSupport::Cache` store.
+
+```ruby
+Esirb.configure do |config|
+  config.cache_store = ActiveSupport::Cache::RedisCacheStore.new(url: ENV["REDIS_URL"], namespace: "esirb", expires_in: 1.day)
+end
+
+Esirb::Client.new(cache_store: nil) # no caching for this client
+```
+
+Use a store that expires entries. Cache keys include the access token, and tokens change about every 20 minutes, so entries for old tokens are never read again. A store without expiry, including `Faraday::HttpCache::MemoryStore`, keeps them forever.
+
+esirb follows ESI's cache headers:
+
+- Responses are kept separate per URL, tenant, language, compatibility date and access token, so a shared store never serves one character's data to another.
+- Authenticated responses are cached too. ESI marks them `private, max-age=5, must-revalidate`, so they're reused for 5 seconds and then revalidated, which returns a cheap `304 Not Modified` when nothing has changed.
+
+### Errors
+
+Error statuses from ESI raise a subclass of `Esirb::ResponseError`, with ESI's own message:
+
+```ruby
+begin
+  client.universe.systems(1).get
+rescue Esirb::NotFound => e
+  e.message # => "404 System not found (GET https://esi.evetech.net/universe/systems/1)"
+  e.status  # => 404
+  e.body    # => { "error" => "System not found" }
+  e.headers # => response headers, e.g. e.headers["X-ESI-Error-Limit-Remain"]
+end
+```
+
+| Class | Raised for |
+|---|---|
+| `Esirb::BadRequest` | 400 |
+| `Esirb::Unauthorized` | 401 |
+| `Esirb::Forbidden` | 403 |
+| `Esirb::NotFound` | 404 |
+| `Esirb::RateLimited` | 420 (ESI's error limit) and 429 (rate limit). `retry_after` gives the seconds to wait, if ESI said. |
+| `Esirb::ClientError` | Any other 4xx, and the parent of the classes above |
+| `Esirb::ServerError` | 5xx |
+| `Esirb::ConnectionFailed` | The connection to ESI failed, including TLS errors |
+| `Esirb::TimeoutError` | ESI didn't answer in time |
+
+Everything esirb raises is an `Esirb::Error`. When an error status is a normal answer, rescue its class. For example, ESI returns 404 for a character's fleet when they aren't in one:
+
+```ruby
+fleet = begin
+  client.characters(123456789).fleet.get.body
+rescue Esirb::NotFound
+  nil
+end
 ```
 
 ## Development

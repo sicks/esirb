@@ -201,18 +201,7 @@ RSpec.describe "Requests sent to ESI" do
     it "raises on error statuses" do
       stub_endpoint(stubs, :get, "/characters/1", response: json_response({ error: "not found" }, status: 404))
 
-      expect { client.characters(1).get }.to raise_error(Faraday::ResourceNotFound)
-    end
-
-    context "with raise_errors: false" do
-      let(:client) { Esirb::Client.new(raise_errors: false) }
-
-      it "returns error responses" do
-        stub_endpoint(stubs, :get, "/characters/1", response: json_response({ error: "not found" }, status: 404))
-        response = client.characters(1).get
-
-        expect([response.status, response.body]).to eq [404, { "error" => "not found" }]
-      end
+      expect { client.characters(1).get }.to raise_error(Esirb::NotFound)
     end
   end
 
@@ -381,17 +370,6 @@ RSpec.describe "Requests sent to ESI" do
 
         expect(requests.size).to eq 2
       end
-    end
-  end
-
-  # Confirmed bugs from the ESIrb project. Each example fails today, so RSpec reports it as pending.
-  # When a fix makes one pass, RSpec fails it and asks for `pending` to be removed.
-  describe "known bugs" do
-    it "raises an Esirb::Error for error statuses (MP-220)" do
-      pending "MP-220: Faraday errors are raised as-is"
-      stub_endpoint(stubs, :get, "/status", response: json_response({ error: "limited" }, status: 420))
-
-      expect { client.status.get }.to raise_error(Esirb::Error)
     end
   end
 end

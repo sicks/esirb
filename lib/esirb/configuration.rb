@@ -14,7 +14,6 @@ module Esirb
       language: "en",
       # Your app's name, version and contact info, e.g. "mappy/1.2 (admin@example.com)".
       user_agent: nil,
-      raise_errors: true,
       # Where to cache responses, e.g. Rails.cache. Anything with read, write and delete works.
       # nil turns caching off.
       cache_store: nil

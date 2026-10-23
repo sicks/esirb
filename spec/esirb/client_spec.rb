@@ -20,8 +20,9 @@ RSpec.describe Esirb::Client do
       expect(client.connection.builder.handlers).not_to include Faraday::HttpCache
     end
 
-    it "includes error response middleware" do
-      expect(client.connection.builder.handlers).to include Faraday::Response::RaiseError
+    it "includes esirb's error middleware in place of Faraday's", :aggregate_failures do
+      expect(client.connection.builder.handlers).to include Esirb::RaiseError
+      expect(client.connection.builder.handlers).not_to include Faraday::Response::RaiseError
     end
 
     it "does not include request authorization" do
@@ -65,6 +66,10 @@ RSpec.describe Esirb::Client do
   describe "options" do
     it "rejects unknown options" do
       expect { described_class.new(tennant: "singularity") }.to raise_error(ArgumentError, /tennant/)
+    end
+
+    it "no longer accepts raise_errors" do
+      expect { described_class.new(raise_errors: false) }.to raise_error(ArgumentError, /raise_errors/)
     end
   end
 
