@@ -59,7 +59,6 @@ Options passed to `Esirb::Client.new` override these for that client:
 | `tenant` | `"tranquility"` | Sent as `X-Tenant`. |
 | `language` | `"en"` | Sent as `Accept-Language`. |
 | `user_agent` | `nil` | Your app's name and contact info, sent before esirb's own User-Agent. |
-| `raise_errors` | `true` | Raise on error statuses instead of returning the response. |
 | `cache_store` | `nil` | Where to cache responses. `nil` turns caching off; see [Caching](#caching). |
 
 Setting `tenant`, `language` or `compatibility_date` to `nil` leaves that header out. `token` is set per client only.
@@ -135,6 +134,43 @@ resp = path.post(params:, body:, headers:)
 ```
 
 Headers passed to a verb are added to the client's default headers, and replace a default with the same name.
+
+### Errors
+
+Error statuses from ESI raise a subclass of `Esirb::ResponseError`, with ESI's own message:
+
+```ruby
+begin
+  client.universe.systems(1).get
+rescue Esirb::NotFound => e
+  e.message # => "404 System not found (GET https://esi.evetech.net/universe/systems/1)"
+  e.status  # => 404
+  e.body    # => { "error" => "System not found" }
+  e.headers # => response headers, e.g. e.headers["X-ESI-Error-Limit-Remain"]
+end
+```
+
+| Class | Raised for |
+|---|---|
+| `Esirb::BadRequest` | 400 |
+| `Esirb::Unauthorized` | 401 |
+| `Esirb::Forbidden` | 403 |
+| `Esirb::NotFound` | 404 |
+| `Esirb::RateLimited` | 420 (ESI's error limit) and 429 (rate limit). `retry_after` gives the seconds to wait, if ESI said. |
+| `Esirb::ClientError` | Any other 4xx, and the parent of the classes above |
+| `Esirb::ServerError` | 5xx |
+| `Esirb::ConnectionFailed` | The connection to ESI failed, including TLS errors |
+| `Esirb::TimeoutError` | ESI didn't answer in time |
+
+Everything esirb raises is an `Esirb::Error`. When an error status is a normal answer, rescue its class. For example, ESI returns 404 for a character's fleet when they aren't in one:
+
+```ruby
+fleet = begin
+  client.characters(123456789).fleet.get.body
+rescue Esirb::NotFound
+  nil
+end
+```
 
 ### All together now
 ```ruby
