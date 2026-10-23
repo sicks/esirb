@@ -11,7 +11,6 @@ RSpec.describe Esirb::Configuration do
         tenant: "tranquility",
         language: "en",
         user_agent: nil,
-        raise_errors: true,
         cache_store: nil
       )
     end
@@ -25,12 +24,11 @@ RSpec.describe Esirb::Configuration do
         config.tenant = "singularity"
         config.language = "de"
         config.user_agent = "mappy/1.2 (admin@example.com)"
-        config.raise_errors = false
       end
       client = Esirb::Client.new
 
-      expect([client.base_url, client.compatibility_date, client.tenant, client.language, client.raise_errors])
-        .to eq ["https://esi.example.test", "2026-06-09", "singularity", "de", false]
+      expect([client.base_url, client.compatibility_date, client.tenant, client.language])
+        .to eq ["https://esi.example.test", "2026-06-09", "singularity", "de"]
       expect(client.user_agent).to eq "mappy/1.2 (admin@example.com) #{Esirb::Client::USER_AGENT}"
     end
 
