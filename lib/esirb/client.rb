@@ -13,7 +13,7 @@ module Esirb
     # Sent after the app's own user_agent, so ESI can tell which library made the request.
     USER_AGENT = "esirb/#{VERSION} (+https://github.com/sicks/esirb)".freeze
 
-    attr_reader :token, :path, :base_url, :compatibility_date, :tenant, :language, :cache_store, :user_agent
+    attr_reader :token, :base_url, :compatibility_date, :tenant, :language, :cache_store, :user_agent, :connection
 
     # token: an ESI access token, or something that responds to call and returns one. A callable
     # is asked before every request, so an app can refresh its token without building a new client.
@@ -26,10 +26,29 @@ module Esirb
 
       @token = token
       apply_settings(Esirb.configuration.to_h.merge(options))
+      # Built here rather than on first use, so threads sharing a client never race to build it.
+      @connection = build_connection
     end
 
-    def connection
-      @connection ||= Faraday.new(base_url) do |c|
+    # Starts a path with a segment exactly as given, for segments that can't be reached by method name.
+    def segment(name, *params)
+      Path.new(client: self).segment(name, *params)
+    end
+
+    def method_missing(name, *, **)
+      return super unless Path.segment_name?(name)
+
+      Path.new(client: self).public_send(name, *, **)
+    end
+
+    def respond_to_missing?(name, include_private = false)
+      Path.segment_name?(name) || super
+    end
+
+    private
+
+    def build_connection
+      Faraday.new(base_url) do |c|
         # Before the cache, so the token is part of each cache key.
         c.request :authorization, "Bearer", access_token if token
         c.headers.update(default_headers)
@@ -42,23 +61,6 @@ module Esirb
         c.request :json
       end
     end
-
-    # Starts a path with a segment exactly as given, for segments that can't be reached by method name.
-    def segment(name, *params)
-      Path.new(client: self).segment(name, *params)
-    end
-
-    def method_missing(name, *, **)
-      return super unless Path.segment_name?(name)
-
-      @path = Path.new(client: self).public_send(name, *, **)
-    end
-
-    def respond_to_missing?(name, include_private = false)
-      Path.segment_name?(name) || super
-    end
-
-    private
 
     # What the authorization middleware sends: the string itself, or a lambda it calls before each
     # request. The lambda refuses a blank token rather than sending "Bearer " to ESI.

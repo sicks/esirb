@@ -63,6 +63,24 @@ RSpec.describe Esirb::Client do
     end
   end
 
+  describe "state" do
+    it "builds its connection when it's created" do
+      expect(client.instance_variable_get(:@connection)).to be_a Faraday::Connection
+    end
+
+    it "keeps no state from building paths" do
+      snapshot = -> { client.instance_variables.to_h { |name| [name, client.instance_variable_get(name)] } }
+
+      expect { client.characters(1).location }.not_to(change(&snapshot))
+    end
+
+    it "no longer remembers the last path; `path` is just a segment" do
+      client.alliances
+
+      expect(client.path.string).to eq "/path"
+    end
+  end
+
   describe "options" do
     it "rejects unknown options" do
       expect { described_class.new(tennant: "singularity") }.to raise_error(ArgumentError, /tennant/)
