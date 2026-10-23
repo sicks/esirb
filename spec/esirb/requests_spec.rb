@@ -148,6 +148,30 @@ RSpec.describe "Requests sent to ESI" do
         expect(requests.first.request_headers["Authorization"]).to eq "Bearer abc123"
       end
     end
+
+    context "with a token callable" do
+      let(:tokens) { %w[first second] }
+      let(:client) { Esirb::Client.new(token: -> { tokens.shift }) }
+
+      it "asks for the token before every request" do
+        requests
+        2.times { client.status.get }
+
+        expect(requests.map { |request| request.request_headers["Authorization"] })
+          .to eq ["Bearer first", "Bearer second"]
+      end
+    end
+
+    context "with a token callable that returns nothing" do
+      let(:client) { Esirb::Client.new(token: -> {}) }
+
+      it "raises instead of sending an empty token", :aggregate_failures do
+        requests
+
+        expect { client.status.get }.to raise_error(Esirb::Error, /token callable returned nil/)
+        expect(requests).to be_empty
+      end
+    end
   end
 
   describe "query params" do
@@ -333,6 +357,17 @@ RSpec.describe "Requests sent to ESI" do
         alice.characters(1).wallet.get
 
         expect(bob.characters(1).wallet.get.body).to eq("owner" => "bob")
+      end
+
+      it "keys entries by the token a callable returns at the time" do
+        tokens = %w[alice bob]
+        client = Esirb::Client.new(cache_store: store, token: -> { tokens.shift })
+        stub_esi(client).get("/characters/1/wallet") do |env|
+          json_response({ owner: env.request_headers["Authorization"] }, headers: esi_cache_headers)
+        end
+        client.characters(1).wallet.get
+
+        expect(client.characters(1).wallet.get.body).to eq("owner" => "Bearer bob")
       end
 
       it "shares responses between clients with the same token" do

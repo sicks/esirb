@@ -68,6 +68,16 @@ RSpec.describe Esirb::Client do
       expect { described_class.new(tennant: "singularity") }.to raise_error(ArgumentError, /tennant/)
     end
 
+    it "accepts a callable token and returns it as given" do
+      token = -> { "abc123" }
+
+      expect(described_class.new(token:).token).to equal token
+    end
+
+    it "rejects a token that is neither a string nor callable" do
+      expect { described_class.new(token: 123) }.to raise_error(ArgumentError, /token must be a string/)
+    end
+
     it "no longer accepts raise_errors" do
       expect { described_class.new(raise_errors: false) }.to raise_error(ArgumentError, /raise_errors/)
     end

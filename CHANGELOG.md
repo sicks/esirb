@@ -26,6 +26,7 @@
 
 - `Esirb.configure` sets defaults for new clients: `base_url`, `compatibility_date`, `tenant`, `language`, `user_agent` and `cache_store`. Each can also be passed to `Esirb::Client.new`.
 - Authenticated responses (`Cache-Control: private`) are cached per access token.
+- `token:` accepts a callable, which is called before every request, so a long-lived client can use your app's refreshed access tokens. A string still works as before.
 - An error hierarchy under `Esirb::Error`: `BadRequest`, `Unauthorized`, `Forbidden`, `NotFound`, `RateLimited` (with `retry_after`), `ClientError` and `ServerError`, each exposing `status`, `body`, `headers` and `response`.
 - `military_campaigns`, `paragon_hub` and `recommended_fit` reach their hyphenated ESI segments, and `rake esi:check_segments` now checks every compatibility date.
 - `user_agent:` client option for your app's name and contact info, sent before esirb's own User-Agent.

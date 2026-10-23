@@ -15,12 +15,14 @@ module Esirb
 
     attr_reader :token, :path, :base_url, :compatibility_date, :tenant, :language, :cache_store, :user_agent
 
+    # token: an ESI access token, or something that responds to call and returns one. A callable
+    # is asked before every request, so an app can refresh its token without building a new client.
+    #
     # Options not given here come from Esirb.configuration: base_url, compatibility_date, tenant,
     # language, user_agent and cache_store. A nil tenant, language or
     # compatibility_date leaves that header out, and a nil cache_store turns caching off.
     def initialize(token: nil, **options)
-      unknown = options.keys - Configuration::DEFAULTS.keys
-      raise ArgumentError, "unknown option#{"s" if unknown.size > 1}: #{unknown.join(", ")}" if unknown.any?
+      check_arguments(token, options)
 
       @token = token
       apply_settings(Esirb.configuration.to_h.merge(options))
@@ -29,7 +31,7 @@ module Esirb
     def connection
       @connection ||= Faraday.new(base_url) do |c|
         # Before the cache, so the token is part of each cache key.
-        c.request :authorization, "Bearer", token if token
+        c.request :authorization, "Bearer", access_token if token
         c.headers.update(default_headers)
 
         c.use RaiseError
@@ -57,6 +59,27 @@ module Esirb
     end
 
     private
+
+    # What the authorization middleware sends: the string itself, or a lambda it calls before each
+    # request. The lambda refuses a blank token rather than sending "Bearer " to ESI.
+    def access_token
+      return token unless token.respond_to?(:call)
+
+      lambda do
+        value = token.call
+        raise Error, "token callable returned #{value.inspect} instead of an access token" if value.to_s.strip.empty?
+
+        value
+      end
+    end
+
+    def check_arguments(token, options)
+      unknown = options.keys - Configuration::DEFAULTS.keys
+      raise ArgumentError, "unknown option#{"s" if unknown.size > 1}: #{unknown.join(", ")}" if unknown.any?
+      return if token.nil? || token.is_a?(String) || token.respond_to?(:call)
+
+      raise ArgumentError, "token must be a string or respond to call, got #{token.class}"
+    end
 
     # Keys cache entries on the URL plus the headers in Vary: tenant, language, compatibility date
     # and, through VaryByAuthorization, the token. Because every entry is per token, the store
