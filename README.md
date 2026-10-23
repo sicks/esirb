@@ -30,6 +30,14 @@ client = Esirb::Client.new
 client = Esirb::Client.new(token: "...")
 ```
 
+ESI access tokens expire after about 20 minutes. If a client lives longer than that, pass something that returns the current token instead, such as a lambda. esirb calls it before every request:
+
+```ruby
+client = Esirb::Client.new(token: -> { character.access_token_refreshing_if_expired })
+```
+
+esirb doesn't refresh tokens itself: your app keeps the refresh token and does the refresh, and esirb only asks for the access token. If the callable returns `nil` or a blank string, the request raises `Esirb::Error` instead of being sent.
+
 ##### Identify your app
 CCP asks every ESI client to send a User-Agent with the app's name and a way to contact you. Pass yours as `user_agent:`, and esirb adds its own name after it:
 
