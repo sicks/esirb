@@ -11,7 +11,10 @@ RSpec.describe Esirb::Configuration do
         tenant: "tranquility",
         language: "en",
         user_agent: nil,
-        cache_store: nil
+        cache_store: nil,
+        timeout: 30,
+        open_timeout: 5,
+        faraday: nil
       )
     end
   end

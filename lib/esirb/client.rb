@@ -13,21 +13,25 @@ module Esirb
     # Sent after the app's own user_agent, so ESI can tell which library made the request.
     USER_AGENT = "esirb/#{VERSION} (+https://github.com/sicks/esirb)".freeze
 
-    attr_reader :token, :base_url, :compatibility_date, :tenant, :language, :cache_store, :user_agent, :connection
+    attr_reader :token, :base_url, :compatibility_date, :tenant, :language, :cache_store, :user_agent,
+                :timeout, :open_timeout, :connection
 
     # token: an ESI access token, or something that responds to call and returns one. A callable
     # is asked before every request, so an app can refresh its token without building a new client.
     #
     # Options not given here come from Esirb.configuration: base_url, compatibility_date, tenant,
-    # language, user_agent and cache_store. A nil tenant, language or
-    # compatibility_date leaves that header out, and a nil cache_store turns caching off.
-    def initialize(token: nil, **options)
+    # language, user_agent, cache_store, timeout, open_timeout and faraday. A nil tenant, language
+    # or compatibility_date leaves that header out, and a nil cache_store turns caching off.
+    #
+    # A block is called with the Faraday connection builder after the configured faraday hook, so
+    # it can add middleware or change the adapter for this client only.
+    def initialize(token: nil, **options, &block)
       check_arguments(token, options)
 
       @token = token
       apply_settings(Esirb.configuration.to_h.merge(options))
       # Built here rather than on first use, so threads sharing a client never race to build it.
-      @connection = build_connection
+      @connection = build_connection(block)
     end
 
     # Starts a path with a segment exactly as given, for segments that can't be reached by method name.
@@ -47,19 +51,25 @@ module Esirb
 
     private
 
-    def build_connection
-      Faraday.new(base_url) do |c|
-        # Before the cache, so the token is part of each cache key.
-        c.request :authorization, "Bearer", access_token if token
-        c.headers.update(default_headers)
-
-        c.use RaiseError
-        c.response :json, content_type: "application/json"
-        # Inside the JSON parser, so the cache stores raw response bodies.
-        use_cache(c) if cache_store
-
-        c.request :json
+    def build_connection(block)
+      Faraday.new(base_url, request: { timeout:, open_timeout: }.compact) do |c|
+        use_middleware(c)
+        # Last, so app middleware sits closest to the network and sees real requests, not cache hits.
+        [@faraday, block].compact.each { |hook| hook.call(c) }
       end
+    end
+
+    def use_middleware(builder)
+      # Before the cache, so the token is part of each cache key.
+      builder.request :authorization, "Bearer", access_token if token
+      builder.headers.update(default_headers)
+
+      builder.use RaiseError
+      builder.response :json, content_type: "application/json"
+      # Inside the JSON parser, so the cache stores raw response bodies.
+      use_cache(builder) if cache_store
+
+      builder.request :json
     end
 
     # What the authorization middleware sends: the string itself, or a lambda it calls before each
@@ -78,9 +88,16 @@ module Esirb
     def check_arguments(token, options)
       unknown = options.keys - Configuration::DEFAULTS.keys
       raise ArgumentError, "unknown option#{"s" if unknown.size > 1}: #{unknown.join(", ")}" if unknown.any?
-      return if token.nil? || token.is_a?(String) || token.respond_to?(:call)
 
-      raise ArgumentError, "token must be a string or respond to call, got #{token.class}"
+      check_callable(:faraday, options[:faraday])
+      check_callable(:token, token, strings: true)
+    end
+
+    def check_callable(name, value, strings: false)
+      return if value.nil? || value.respond_to?(:call) || (strings && value.is_a?(String))
+
+      expected = strings ? "a string or something that responds to call" : "something that responds to call"
+      raise ArgumentError, "#{name} must be #{expected}, got #{value.class}"
     end
 
     # Keys cache entries on the URL plus the headers in Vary: tenant, language, compatibility date
@@ -98,6 +115,9 @@ module Esirb
       @tenant = settings[:tenant]
       @language = settings[:language]
       @cache_store = settings[:cache_store]
+      @timeout = settings[:timeout]
+      @open_timeout = settings[:open_timeout]
+      @faraday = settings[:faraday]
       app_user_agent = settings[:user_agent].to_s.strip
       @user_agent = app_user_agent.empty? ? USER_AGENT : "#{app_user_agent} #{USER_AGENT}"
     end

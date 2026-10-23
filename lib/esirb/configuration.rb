@@ -16,7 +16,13 @@ module Esirb
       user_agent: nil,
       # Where to cache responses, e.g. Rails.cache. Anything with read, write and delete works.
       # nil turns caching off.
-      cache_store: nil
+      cache_store: nil,
+      # Seconds to wait for a response, and to open the connection. nil leaves it to the adapter.
+      timeout: 30,
+      open_timeout: 5,
+      # Called with the Faraday connection builder after esirb's own setup, to add middleware,
+      # change the adapter or set other connection options.
+      faraday: nil
     }.freeze
 
     attr_accessor(*DEFAULTS.keys)

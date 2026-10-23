@@ -63,6 +63,47 @@ RSpec.describe Esirb::Client do
     end
   end
 
+  describe "timeouts" do
+    it "defaults to 30 seconds for a response and 5 to connect", :aggregate_failures do
+      expect(client.connection.options.timeout).to eq 30
+      expect(client.connection.options.open_timeout).to eq 5
+    end
+
+    it "uses configured timeouts, overridden per client", :aggregate_failures do
+      Esirb.configure { |config| config.timeout = 10 }
+      client = described_class.new(open_timeout: 2)
+
+      expect(client.connection.options.timeout).to eq 10
+      expect(client.connection.options.open_timeout).to eq 2
+    end
+
+    it "leaves a nil timeout to the adapter" do
+      expect(described_class.new(timeout: nil).connection.options.timeout).to be_nil
+    end
+  end
+
+  describe "faraday hooks" do
+    it "calls the configured hook, then the client's block, with the connection builder" do
+      calls = []
+      Esirb.configure { |config| config.faraday = ->(builder) { calls << [:configured, builder.class] } }
+      described_class.new { |builder| calls << [:block, builder.class] }
+
+      expect(calls).to eq [[:configured, Faraday::Connection], [:block, Faraday::Connection]]
+    end
+
+    it "lets a client's faraday option replace the configured hook" do
+      calls = []
+      Esirb.configure { |config| config.faraday = ->(_) { calls << :configured } }
+      described_class.new(faraday: ->(_) { calls << :client })
+
+      expect(calls).to eq [:client]
+    end
+
+    it "rejects a faraday option that isn't callable" do
+      expect { described_class.new(faraday: "logger") }.to raise_error(ArgumentError, /faraday must be/)
+    end
+  end
+
   describe "state" do
     it "builds its connection when it's created" do
       expect(client.instance_variable_get(:@connection)).to be_a Faraday::Connection
