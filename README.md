@@ -129,8 +129,25 @@ Options passed to `Esirb::Client.new` override these for that client:
 | `language` | `"en"` | Sent as `Accept-Language`. |
 | `user_agent` | `nil` | Your app's name and contact info, sent before esirb's own User-Agent. |
 | `cache_store` | `nil` | Where to cache responses. `nil` turns caching off; see [Caching](#caching). |
+| `timeout` | `30` | Seconds to wait for a response. `nil` leaves it to the adapter. |
+| `open_timeout` | `5` | Seconds to wait to open the connection. `nil` leaves it to the adapter. |
+| `faraday` | `nil` | A callable that customizes the Faraday connection; see [Customizing the connection](#customizing-the-connection). |
 
 Setting `tenant`, `language` or `compatibility_date` to `nil` leaves that header out. `token` is set per client only.
+
+### Customizing the connection
+
+esirb uses [Faraday](https://lostisland.github.io/faraday/). To add middleware, change the adapter or set other connection options, give `Esirb.configure` a `faraday` callable, or pass a block to a client. Both receive the Faraday connection builder after esirb has set up its own middleware:
+
+```ruby
+Esirb.configure do |config|
+  config.faraday = ->(f) { f.response :logger, Rails.logger }
+end
+
+client = Esirb::Client.new { |f| f.adapter :net_http_persistent }
+```
+
+(`:net_http_persistent` comes from the `faraday-net_http_persistent` gem, which you'd add to your Gemfile.) The configured callable runs first, then the client's block. Middleware added this way sits closest to the network, so a logger sees the requests that actually go to ESI, not responses served from the cache.
 
 ### Caching
 
@@ -175,8 +192,8 @@ end
 | `Esirb::RateLimited` | 420 (ESI's error limit) and 429 (rate limit). `retry_after` gives the seconds to wait, if ESI said. |
 | `Esirb::ClientError` | Any other 4xx, and the parent of the classes above |
 | `Esirb::ServerError` | 5xx |
-| `Esirb::ConnectionFailed` | The connection to ESI failed, including TLS errors |
-| `Esirb::TimeoutError` | ESI didn't answer in time |
+| `Esirb::ConnectionFailed` | The connection to ESI failed, including TLS errors and timeouts while connecting |
+| `Esirb::TimeoutError` | ESI connected but didn't answer within `timeout` |
 
 Everything esirb raises is an `Esirb::Error`. When an error status is a normal answer, rescue its class. For example, ESI returns 404 for a character's fleet when they aren't in one:
 

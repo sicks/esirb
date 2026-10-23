@@ -3,6 +3,7 @@
 ### Changed
 
 - Requires Ruby 3.3 or newer.
+- Requests time out after 30 seconds waiting for a response and 5 seconds opening the connection. Before, they used the adapter's defaults (60 seconds each for Net::HTTP).
 - The default ESI compatibility date is `2026-08-18` (was `2026-06-09`). Set `compatibility_date` to keep the old one.
 - Headers and params passed to an HTTP verb are merged with the defaults instead of replacing them. A per-request header replaces a default with the same name.
 - Requests no longer send empty `If-Modified-Since` and `If-None-Match` headers.
@@ -27,6 +28,7 @@
 
 - `Esirb.configure` sets defaults for new clients: `base_url`, `compatibility_date`, `tenant`, `language`, `user_agent` and `cache_store`. Each can also be passed to `Esirb::Client.new`.
 - Authenticated responses (`Cache-Control: private`) are cached per access token.
+- `timeout` and `open_timeout` options, and a `faraday` option or client block for adding middleware, changing the adapter or setting other connection options.
 - `token:` accepts a callable, which is called before every request, so a long-lived client can use your app's refreshed access tokens. A string still works as before.
 - An error hierarchy under `Esirb::Error`: `BadRequest`, `Unauthorized`, `Forbidden`, `NotFound`, `RateLimited` (with `retry_after`), `ClientError` and `ServerError`, each exposing `status`, `body`, `headers` and `response`.
 - `military_campaigns`, `paragon_hub` and `recommended_fit` reach their hyphenated ESI segments, and `rake esi:check_segments` now checks every compatibility date.
