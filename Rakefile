@@ -17,7 +17,7 @@ namespace :esi do
     require "json"
     require_relative "lib/esirb"
 
-    client = Esirb::Client.new(cache: false)
+    client = Esirb::Client.new
     dates = client.meta.compatibility_dates.get.body["compatibility_dates"]
 
     # Segments never change spelling between dates, so the list covers every date ESI has published.

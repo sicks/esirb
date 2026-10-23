@@ -14,6 +14,8 @@
 - HTTP verbs raise `ArgumentError` on unknown options, and a `false` body is sent instead of dropped.
 - `Esirb::Path.new` requires a client.
 - `Esirb::Client.new` raises `ArgumentError` on unknown options.
+- Responses are cached only when a `cache_store` is set, in `Esirb.configure` or per client. Before, every client cached in its own unbounded in-memory store by default.
+- The cache stores raw response bodies as JSON instead of Marshal data.
 
 ### Fixed
 
@@ -21,7 +23,8 @@
 
 ### Added
 
-- `Esirb.configure` sets defaults for new clients: `base_url`, `compatibility_date`, `tenant`, `language`, `user_agent` and `raise_errors`. Each can also be passed to `Esirb::Client.new`.
+- `Esirb.configure` sets defaults for new clients: `base_url`, `compatibility_date`, `tenant`, `language`, `user_agent`, `raise_errors` and `cache_store`. Each can also be passed to `Esirb::Client.new`.
+- Authenticated responses (`Cache-Control: private`) are cached per access token.
 - `military_campaigns`, `paragon_hub` and `recommended_fit` reach their hyphenated ESI segments, and `rake esi:check_segments` now checks every compatibility date.
 - `user_agent:` client option for your app's name and contact info, sent before esirb's own User-Agent.
 - Hyphenated ESI segments can be called with underscores: `client.characters(1).freelance_jobs` requests `/characters/1/freelance-jobs`. Only ESI's known hyphenated segments are converted.
@@ -31,6 +34,7 @@
 
 ### Removed
 
+- The `cache:` client option. Pass `cache_store: nil` to turn caching off for one client.
 - `Esirb::Client::BASE_URL` and `Esirb::Client::DEFAULT_HEADERS`. Use `Esirb.configuration` or the client's readers (`base_url`, `compatibility_date`, ...).
 - The `trace` HTTP verb. ESI doesn't support it, and `trace` now works as a path segment.
 

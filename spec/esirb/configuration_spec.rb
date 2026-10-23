@@ -11,7 +11,8 @@ RSpec.describe Esirb::Configuration do
         tenant: "tranquility",
         language: "en",
         user_agent: nil,
-        raise_errors: true
+        raise_errors: true,
+        cache_store: nil
       )
     end
   end
