@@ -124,7 +124,7 @@ Options passed to `Esirb::Client.new` override these for that client:
 | Option | Default | Notes |
 |---|---|---|
 | `base_url` | `"https://esi.evetech.net"` | |
-| `compatibility_date` | `"2026-08-18"` | Sent as `X-Compatibility-Date`. A newer date can change response shapes, so check your code against it before switching. |
+| `compatibility_date` | `"2026-08-18"` | Sent as `X-Compatibility-Date`, as a `"YYYY-MM-DD"` string or a `Date`. A newer date can change response shapes, so check your code against it before switching. Any date up to today works (ESI's day starts at 11:00 UTC), and ESI uses the latest published date on or before it. It can't be in the future, or `nil`: without a date, ESI uses its oldest behavior. |
 | `tenant` | `"tranquility"` | Sent as `X-Tenant`. |
 | `language` | `"en"` | Sent as `Accept-Language`. |
 | `user_agent` | `nil` | Your app's name and contact info, sent before esirb's own User-Agent. |
@@ -134,7 +134,7 @@ Options passed to `Esirb::Client.new` override these for that client:
 | `retries` | `2` | Times to retry a request that hit a 502, 503 or 504, a timeout or a connection failure; see [Retries](#retries). `0` turns retries off. |
 | `faraday` | `nil` | A callable that customizes the Faraday connection; see [Customizing the connection](#customizing-the-connection). |
 
-Setting `tenant`, `language` or `compatibility_date` to `nil` leaves that header out. `token` is set per client only.
+Setting `tenant` or `language` to `nil` leaves that header out. `token` is set per client only.
 
 ### Customizing the connection
 

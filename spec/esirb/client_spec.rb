@@ -99,6 +99,21 @@ RSpec.describe Esirb::Client do
       expect(calls).to eq [:client]
     end
 
+    # The date rules themselves are in compatibility_date_spec.rb; these check the client applies them.
+    it "rejects a nil compatibility_date" do
+      expect { described_class.new(compatibility_date: nil) }.to raise_error(ArgumentError, /oldest behavior/)
+    end
+
+    it "rejects a nil compatibility_date set in Esirb.configure" do
+      Esirb.configure { |config| config.compatibility_date = nil }
+
+      expect { described_class.new }.to raise_error(ArgumentError, /compatibility_date can't be nil/)
+    end
+
+    it "keeps a Date compatibility_date as a YYYY-MM-DD string" do
+      expect(described_class.new(compatibility_date: Date.new(2026, 6, 9)).compatibility_date).to eq "2026-06-09"
+    end
+
     it "rejects a retries option that isn't a whole number of 0 or more" do
       expect { described_class.new(retries: -1) }.to raise_error(ArgumentError, /retries must be/)
     end

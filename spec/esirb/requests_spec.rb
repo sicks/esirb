@@ -68,15 +68,15 @@ RSpec.describe "Requests sent to ESI" do
       end
     end
 
-    context "with nil tenant, language and compatibility_date" do
-      let(:client) { Esirb::Client.new(tenant: nil, language: nil, compatibility_date: nil) }
+    context "with nil tenant and language" do
+      let(:client) { Esirb::Client.new(tenant: nil, language: nil) }
 
       it "leaves those headers out" do
         requests
         client.status.get
 
         expect(requests.first.request_headers.keys)
-          .not_to include("X-Tenant", "Accept-Language", "X-Compatibility-Date")
+          .not_to include("X-Tenant", "Accept-Language")
       end
     end
 

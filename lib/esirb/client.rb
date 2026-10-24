@@ -5,6 +5,7 @@ require "faraday-http-cache"
 require "faraday/retry"
 require_relative "version"
 require_relative "configuration"
+require_relative "compatibility_date"
 require_relative "raise_error"
 require_relative "vary_by_authorization"
 
@@ -28,8 +29,9 @@ module Esirb
     # is asked before every request, so an app can refresh its token without building a new client.
     #
     # Options not given here come from Esirb.configuration: base_url, compatibility_date, tenant,
-    # language, user_agent, cache_store, timeout, open_timeout, retries and faraday. A nil tenant, language
-    # or compatibility_date leaves that header out, and a nil cache_store turns caching off.
+    # language, user_agent, cache_store, timeout, open_timeout, retries and faraday. A nil tenant or
+    # language leaves that header out, and a nil cache_store turns caching off. compatibility_date
+    # must be a YYYY-MM-DD string or a Date: without one, ESI would use its oldest behavior.
     #
     # A block is called with the Faraday connection builder after the configured faraday hook, so
     # it can add middleware or change the adapter for this client only.
@@ -104,6 +106,7 @@ module Esirb
       check_callable(:token, token, strings: true)
     end
 
+    # A request without a date gets ESI's oldest behavior, so a missing date is an error, not a default.
     def check_retries(retries)
       return if retries.is_a?(Integer) && retries >= 0
 
@@ -127,7 +130,10 @@ module Esirb
     end
 
     def apply_settings(settings)
-      (Configuration::DEFAULTS.keys - [:user_agent]).each { |name| instance_variable_set(:"@#{name}", settings[name]) }
+      (Configuration::DEFAULTS.keys - %i[user_agent compatibility_date]).each do |name|
+        instance_variable_set(:"@#{name}", settings[name])
+      end
+      @compatibility_date = CompatibilityDate.parse(settings[:compatibility_date])
       app_user_agent = settings[:user_agent].to_s.strip
       @user_agent = app_user_agent.empty? ? USER_AGENT : "#{app_user_agent} #{USER_AGENT}"
     end

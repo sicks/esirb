@@ -17,6 +17,7 @@
 - HTTP verbs raise `ArgumentError` on unknown options, and a `false` body is sent instead of dropped.
 - `Esirb::Path.new` requires a client.
 - `Esirb::Client.new` raises `ArgumentError` on unknown options.
+- `compatibility_date` can't be `nil`, since a request without a date gets ESI's oldest behavior, and must be a `YYYY-MM-DD` string or a `Date` that isn't in the future (ESI's day starts at 11:00 UTC). These are checked when the client is created, instead of failing with a 400 on the first request.
 - A client builds its Faraday connection when it's created instead of on first use, and keeps no state from building paths, so one client can be shared between threads.
 - Responses are cached only when a `cache_store` is set, in `Esirb.configure` or per client. Before, every client cached in its own unbounded in-memory store by default.
 - The cache stores raw response bodies as JSON instead of Marshal data.
