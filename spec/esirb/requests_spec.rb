@@ -287,6 +287,14 @@ RSpec.describe "Requests sent to ESI" do
       expect(client.status.get.body).to eq("players" => 30_000)
     end
 
+    %w[application/openapi+json application/problem+json].each do |type|
+      it "parses #{type} bodies" do
+        stub_endpoint(stubs, :get, "/meta/openapi.json", response: [200, { "Content-Type" => type }, '{"paths":{}}'])
+
+        expect(client.meta.segment("openapi.json").get.body).to eq("paths" => {})
+      end
+    end
+
     it "leaves non-JSON bodies as strings" do
       stub_endpoint(stubs, :get, "/status", response: [200, { "Content-Type" => "text/plain" }, "ok"])
 
