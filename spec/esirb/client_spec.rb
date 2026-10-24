@@ -99,6 +99,10 @@ RSpec.describe Esirb::Client do
       expect(calls).to eq [:client]
     end
 
+    it "rejects a retries option that isn't a whole number of 0 or more" do
+      expect { described_class.new(retries: -1) }.to raise_error(ArgumentError, /retries must be/)
+    end
+
     it "rejects a faraday option that isn't callable" do
       expect { described_class.new(faraday: "logger") }.to raise_error(ArgumentError, /faraday must be/)
     end
