@@ -174,6 +174,54 @@ RSpec.describe "Requests sent to ESI" do
     end
   end
 
+  describe "connection options" do
+    it "sends the timeouts with each request", :aggregate_failures do
+      requests = stub_endpoint(stubs, :get, "/status")
+      client.status.get
+
+      expect(requests.first.request.timeout).to eq 30
+      expect(requests.first.request.open_timeout).to eq 5
+    end
+
+    it "lets a client's block replace the adapter" do
+      own_stubs = Faraday::Adapter::Test::Stubs.new
+      requests = stub_endpoint(own_stubs, :get, "/status")
+      client = Esirb::Client.new { |f| f.adapter :test, own_stubs }
+      client.status.get
+
+      expect(requests.size).to eq 1
+    end
+
+    context "with middleware added by the configured hook" do
+      let(:seen) { [] }
+      let(:recorder) do
+        log = seen
+        Class.new(Faraday::Middleware) { define_method(:on_request) { |env| log << env.url.path } }
+      end
+
+      before do
+        middleware = recorder
+        Esirb.configure { |config| config.faraday = ->(f) { f.use middleware } }
+      end
+
+      it "runs it for every client's requests" do
+        stub_endpoint(stubs, :get, "/status")
+        client.status.get
+
+        expect(seen).to eq ["/status"]
+      end
+
+      it "runs it inside the cache, so it only sees requests that reach ESI" do
+        client = Esirb::Client.new(cache_store: Faraday::HttpCache::MemoryStore.new)
+        response = json_response({ players: 1 }, headers: { "Cache-Control" => "public, max-age=60" })
+        stub_endpoint(stub_esi(client), :get, "/status", response:)
+        2.times { client.status.get }
+
+        expect(seen).to eq ["/status"]
+      end
+    end
+  end
+
   describe "sharing a client between threads" do
     it "sends each thread's own request" do
       requests = stub_endpoint(stubs, :get, %r{\A/characters/\d+/location\z})
