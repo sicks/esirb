@@ -70,7 +70,7 @@ module Esirb
       # Outside RaiseError, so it sees esirb's errors.
       builder.use Retry, retries: retries if retries.positive?
       builder.use RaiseError
-      builder.response :json, content_type: "application/json"
+      builder.response :json
       # Inside the JSON parser, so the cache stores raw response bodies.
       use_cache(builder) if cache_store
 
