@@ -17,8 +17,8 @@ RSpec.describe Esirb::RaiseError do
       401 => Esirb::Unauthorized,
       403 => Esirb::Forbidden,
       404 => Esirb::NotFound,
-      420 => Esirb::RateLimited,
-      429 => Esirb::RateLimited,
+      420 => Esirb::ErrorLimited,
+      429 => Esirb::TooManyRequests,
       418 => Esirb::ClientError,
       500 => Esirb::ServerError,
       501 => Esirb::ServerError,
@@ -34,6 +34,10 @@ RSpec.describe Esirb::RaiseError do
     it "makes every status error an Esirb::ResponseError and an Esirb::Error" do
       expect(Esirb::ResponseError::STATUS_ERRORS.values + [Esirb::ClientError, Esirb::ServerError])
         .to all(be <= Esirb::ResponseError).and all(be <= Esirb::Error)
+    end
+
+    it "groups 420 and 429 under RateLimited" do
+      expect([Esirb::ErrorLimited, Esirb::TooManyRequests]).to all(be < Esirb::RateLimited)
     end
 
     it "groups 502, 503 and 504 under ServerError" do
@@ -53,6 +57,10 @@ RSpec.describe Esirb::RaiseError do
 
     it "uses ESI's error message, the status and the request" do
       expect(error.message).to eq "404 System not found (GET https://esi.evetech.net/universe/systems/1)"
+    end
+
+    it "exposes the error limit as of the response" do
+      expect(error.rate_limit.error_limit_remaining).to eq 99
     end
 
     it "exposes the status, parsed body, headers and response", :aggregate_failures do

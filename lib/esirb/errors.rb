@@ -1,5 +1,7 @@
 # frozen_string_literal: true
 
+require_relative "rate_limit"
+
 module Esirb
   # Base class for everything esirb raises.
   class Error < StandardError; end
@@ -24,6 +26,11 @@ module Esirb
       @body = env.body
       @response = env.response
       super("#{status} #{detail(env)} (#{env.method.to_s.upcase} #{env.url})")
+    end
+
+    # ESI's rate or error limit as of this response.
+    def rate_limit
+      RateLimit.new(headers)
     end
 
     private
@@ -53,6 +60,13 @@ module Esirb
     end
   end
 
+  # 420: too many errors in the error limit's window. The limit is global, so every ESI route
+  # returns 420 until it resets. Never retried.
+  class ErrorLimited < RateLimited; end
+
+  # 429: a rate limit group's tokens are used up. Retried when Retry-After is short.
+  class TooManyRequests < RateLimited; end
+
   # Any 5xx status.
   class ServerError < ResponseError; end
 
@@ -66,8 +80,8 @@ module Esirb
     401 => Unauthorized,
     403 => Forbidden,
     404 => NotFound,
-    420 => RateLimited,
-    429 => RateLimited,
+    420 => ErrorLimited,
+    429 => TooManyRequests,
     502 => BadGateway,
     503 => ServiceUnavailable,
     504 => GatewayTimeout
