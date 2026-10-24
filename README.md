@@ -131,6 +131,7 @@ Options passed to `Esirb::Client.new` override these for that client:
 | `cache_store` | `nil` | Where to cache responses. `nil` turns caching off; see [Caching](#caching). |
 | `timeout` | `30` | Seconds to wait for a response. `nil` leaves it to the adapter. |
 | `open_timeout` | `5` | Seconds to wait to open the connection. `nil` leaves it to the adapter. |
+| `retries` | `2` | Times to retry a request that hit a 502, 503 or 504, a timeout or a connection failure; see [Retries](#retries). `0` turns retries off. |
 | `faraday` | `nil` | A callable that customizes the Faraday connection; see [Customizing the connection](#customizing-the-connection). |
 
 Setting `tenant`, `language` or `compatibility_date` to `nil` leaves that header out. `token` is set per client only.
@@ -191,7 +192,8 @@ end
 | `Esirb::NotFound` | 404 |
 | `Esirb::RateLimited` | 420 (ESI's error limit) and 429 (rate limit). `retry_after` gives the seconds to wait, if ESI said. |
 | `Esirb::ClientError` | Any other 4xx, and the parent of the classes above |
-| `Esirb::ServerError` | 5xx |
+| `Esirb::BadGateway`, `Esirb::ServiceUnavailable`, `Esirb::GatewayTimeout` | 502, 503 and 504, after esirb's retries run out |
+| `Esirb::ServerError` | Any other 5xx, and the parent of the three classes above |
 | `Esirb::ConnectionFailed` | The connection to ESI failed, including TLS errors and timeouts while connecting |
 | `Esirb::TimeoutError` | ESI connected but didn't answer within `timeout` |
 
@@ -204,6 +206,16 @@ rescue Esirb::NotFound
   nil
 end
 ```
+
+### Retries
+
+ESI often answers with a 502, 503 or 504 that clears up within a second or two, so esirb retries those, along with timeouts and connection failures. By default it retries twice, waiting about half a second and then a second, with some randomness so many clients don't retry at the same moment.
+
+- Only GET, HEAD, PUT and DELETE are retried. POST isn't, since repeating it might do something twice, like sending a mail.
+- If ESI sends `Retry-After`, esirb waits that long instead. If it asks for more than 10 seconds, esirb raises straight away rather than tie up your process.
+- Other errors, including 500, 4xx and the rate limits (420 and 429), aren't retried.
+
+Set `retries` in `Esirb.configure` or per client to change the number, or to `0` to turn retries off. Worst case, a request takes about `(retries + 1) * timeout` seconds plus the waits, so lower `timeout` or `retries` together if that's too long.
 
 ## Development
 
