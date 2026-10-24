@@ -37,6 +37,10 @@ RSpec.describe Esirb::CompatibilityDate do
           .to raise_error(ArgumentError, /2026-10-24 is in the future; ESI's current date is 2026-10-23/)
       end
 
+      it "accepts a DateTime later in ESI's current day, ignoring its time" do
+        expect(described_class.parse(DateTime.new(2026, 10, 23, 23, 59))).to eq "2026-10-23"
+      end
+
       it "rejects a future Date too" do
         expect { described_class.parse(Date.new(2026, 10, 24)) }.to raise_error(ArgumentError, /in the future/)
       end

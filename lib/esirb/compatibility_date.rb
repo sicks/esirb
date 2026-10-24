@@ -28,6 +28,7 @@ module Esirb
     end
 
     def self.to_date(value)
+      # DateTime is a Date too. to_date drops its time, so a later hour today isn't counted as the future.
       return value.to_date if value.is_a?(Date)
 
       text = value.to_s
