@@ -14,6 +14,7 @@ RSpec.describe Esirb::Configuration do
         cache_store: nil,
         timeout: 30,
         open_timeout: 5,
+        retries: 2,
         faraday: nil
       )
     end

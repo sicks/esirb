@@ -21,9 +21,10 @@ RSpec.describe Esirb::RaiseError do
       429 => Esirb::RateLimited,
       418 => Esirb::ClientError,
       500 => Esirb::ServerError,
-      502 => Esirb::ServerError,
-      503 => Esirb::ServerError,
-      504 => Esirb::ServerError
+      501 => Esirb::ServerError,
+      502 => Esirb::BadGateway,
+      503 => Esirb::ServiceUnavailable,
+      504 => Esirb::GatewayTimeout
     }.each do |status, error_class|
       it "raises #{error_class} for #{status}" do
         expect(error_for(status)).to be_an_instance_of(error_class)
@@ -33,6 +34,10 @@ RSpec.describe Esirb::RaiseError do
     it "makes every status error an Esirb::ResponseError and an Esirb::Error" do
       expect(Esirb::ResponseError::STATUS_ERRORS.values + [Esirb::ClientError, Esirb::ServerError])
         .to all(be <= Esirb::ResponseError).and all(be <= Esirb::Error)
+    end
+
+    it "groups 502, 503 and 504 under ServerError" do
+      expect([Esirb::BadGateway, Esirb::ServiceUnavailable, Esirb::GatewayTimeout]).to all(be < Esirb::ServerError)
     end
 
     it "groups 4xx classes under ClientError" do

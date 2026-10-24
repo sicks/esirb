@@ -56,12 +56,20 @@ module Esirb
   # Any 5xx status.
   class ServerError < ResponseError; end
 
+  # Usually transient on ESI's side, so esirb retries these (see the retries option).
+  class BadGateway < ServerError; end
+  class ServiceUnavailable < ServerError; end
+  class GatewayTimeout < ServerError; end
+
   ResponseError::STATUS_ERRORS = {
     400 => BadRequest,
     401 => Unauthorized,
     403 => Forbidden,
     404 => NotFound,
     420 => RateLimited,
-    429 => RateLimited
+    429 => RateLimited,
+    502 => BadGateway,
+    503 => ServiceUnavailable,
+    504 => GatewayTimeout
   }.freeze
 end

@@ -15,6 +15,11 @@ RSpec.configure do |config|
 
   config.after { Esirb.reset_configuration! }
 
+  # Retries still happen in specs, just without waiting between attempts.
+  config.before do
+    stub_const("Esirb::Client::RETRY_OPTIONS", Esirb::Client::RETRY_OPTIONS.merge(interval: 0, interval_randomness: 0))
+  end
+
   config.expect_with :rspec do |c|
     c.syntax = :expect
   end

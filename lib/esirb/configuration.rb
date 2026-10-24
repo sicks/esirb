@@ -20,6 +20,9 @@ module Esirb
       # Seconds to wait for a response, and to open the connection. nil leaves it to the adapter.
       timeout: 30,
       open_timeout: 5,
+      # Times to retry a request that failed with a 502, 503 or 504, a timeout or a connection
+      # failure. Only GET, HEAD, PUT and DELETE are retried. 0 turns retries off.
+      retries: 2,
       # Called with the Faraday connection builder after esirb's own setup, to add middleware,
       # change the adapter or set other connection options.
       faraday: nil

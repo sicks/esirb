@@ -2,6 +2,7 @@
 
 require "faraday"
 require "faraday-http-cache"
+require "faraday/retry"
 require_relative "version"
 require_relative "configuration"
 require_relative "raise_error"
@@ -13,14 +14,21 @@ module Esirb
     # Sent after the app's own user_agent, so ESI can tell which library made the request.
     USER_AGENT = "esirb/#{VERSION} (+https://github.com/sicks/esirb)".freeze
 
+    # Errors worth retrying: ESI usually recovers from these within a second or two.
+    RETRY_ERRORS = [BadGateway, ServiceUnavailable, GatewayTimeout, TimeoutError, ConnectionFailed].freeze
+    # Waits about 0.5s, then 1s, plus up to 50% randomness so clients don't retry in step. A
+    # Retry-After header from ESI is honored, unless it asks for longer than max_interval, in
+    # which case the error is raised straight away.
+    RETRY_OPTIONS = { interval: 0.5, backoff_factor: 2, interval_randomness: 0.5, max_interval: 10 }.freeze
+
     attr_reader :token, :base_url, :compatibility_date, :tenant, :language, :cache_store, :user_agent,
-                :timeout, :open_timeout, :connection
+                :timeout, :open_timeout, :retries, :connection
 
     # token: an ESI access token, or something that responds to call and returns one. A callable
     # is asked before every request, so an app can refresh its token without building a new client.
     #
     # Options not given here come from Esirb.configuration: base_url, compatibility_date, tenant,
-    # language, user_agent, cache_store, timeout, open_timeout and faraday. A nil tenant, language
+    # language, user_agent, cache_store, timeout, open_timeout, retries and faraday. A nil tenant, language
     # or compatibility_date leaves that header out, and a nil cache_store turns caching off.
     #
     # A block is called with the Faraday connection builder after the configured faraday hook, so
@@ -64,6 +72,8 @@ module Esirb
       builder.request :authorization, "Bearer", access_token if token
       builder.headers.update(default_headers)
 
+      # Outside RaiseError, so it sees esirb's error classes and can retry by class.
+      builder.request :retry, max: retries, exceptions: RETRY_ERRORS, **RETRY_OPTIONS if retries.positive?
       builder.use RaiseError
       builder.response :json, content_type: "application/json"
       # Inside the JSON parser, so the cache stores raw response bodies.
@@ -90,7 +100,14 @@ module Esirb
       raise ArgumentError, "unknown option#{"s" if unknown.size > 1}: #{unknown.join(", ")}" if unknown.any?
 
       check_callable(:faraday, options[:faraday])
+      check_retries(options.fetch(:retries, 0))
       check_callable(:token, token, strings: true)
+    end
+
+    def check_retries(retries)
+      return if retries.is_a?(Integer) && retries >= 0
+
+      raise ArgumentError, "retries must be an Integer of 0 or more, got #{retries.inspect}"
     end
 
     def check_callable(name, value, strings: false)
@@ -110,14 +127,7 @@ module Esirb
     end
 
     def apply_settings(settings)
-      @base_url = settings[:base_url]
-      @compatibility_date = settings[:compatibility_date]
-      @tenant = settings[:tenant]
-      @language = settings[:language]
-      @cache_store = settings[:cache_store]
-      @timeout = settings[:timeout]
-      @open_timeout = settings[:open_timeout]
-      @faraday = settings[:faraday]
+      (Configuration::DEFAULTS.keys - [:user_agent]).each { |name| instance_variable_set(:"@#{name}", settings[name]) }
       app_user_agent = settings[:user_agent].to_s.strip
       @user_agent = app_user_agent.empty? ? USER_AGENT : "#{app_user_agent} #{USER_AGENT}"
     end
