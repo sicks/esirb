@@ -2,11 +2,11 @@
 
 require "faraday"
 require "faraday-http-cache"
-require "faraday/retry"
 require_relative "version"
 require_relative "configuration"
 require_relative "compatibility_date"
 require_relative "raise_error"
+require_relative "retry"
 require_relative "vary_by_authorization"
 
 module Esirb
@@ -14,13 +14,6 @@ module Esirb
   class Client
     # Sent after the app's own user_agent, so ESI can tell which library made the request.
     USER_AGENT = "esirb/#{VERSION} (+https://github.com/sicks/esirb)".freeze
-
-    # Errors worth retrying: ESI usually recovers from these within a second or two.
-    RETRY_ERRORS = [BadGateway, ServiceUnavailable, GatewayTimeout, TimeoutError, ConnectionFailed].freeze
-    # Waits about 0.5s, then 1s, plus up to 50% randomness so clients don't retry in step. A
-    # Retry-After header from ESI is honored, unless it asks for longer than max_interval, in
-    # which case the error is raised straight away.
-    RETRY_OPTIONS = { interval: 0.5, backoff_factor: 2, interval_randomness: 0.5, max_interval: 10 }.freeze
 
     attr_reader :token, :base_url, :compatibility_date, :tenant, :language, :cache_store, :user_agent,
                 :timeout, :open_timeout, :retries, :connection
@@ -74,8 +67,8 @@ module Esirb
       builder.request :authorization, "Bearer", access_token if token
       builder.headers.update(default_headers)
 
-      # Outside RaiseError, so it sees esirb's error classes and can retry by class.
-      builder.request :retry, max: retries, exceptions: RETRY_ERRORS, **RETRY_OPTIONS if retries.positive?
+      # Outside RaiseError, so it sees esirb's errors.
+      builder.use Retry, retries: retries if retries.positive?
       builder.use RaiseError
       builder.response :json, content_type: "application/json"
       # Inside the JSON parser, so the cache stores raw response bodies.

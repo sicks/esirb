@@ -190,7 +190,9 @@ end
 | `Esirb::Unauthorized` | 401 |
 | `Esirb::Forbidden` | 403 |
 | `Esirb::NotFound` | 404 |
-| `Esirb::RateLimited` | 420 (ESI's error limit) and 429 (rate limit). `retry_after` gives the seconds to wait, if ESI said. |
+| `Esirb::ErrorLimited` | 420: too many errors in ESI's error limit window. Every route is blocked until it resets. |
+| `Esirb::TooManyRequests` | 429: a rate limit group is used up, after esirb's retries run out |
+| `Esirb::RateLimited` | The parent of the two above. `retry_after` gives the seconds to wait, if ESI said. |
 | `Esirb::ClientError` | Any other 4xx, and the parent of the classes above |
 | `Esirb::BadGateway`, `Esirb::ServiceUnavailable`, `Esirb::GatewayTimeout` | 502, 503 and 504, after esirb's retries run out |
 | `Esirb::ServerError` | Any other 5xx, and the parent of the three classes above |
@@ -213,9 +215,38 @@ ESI often answers with a 502, 503 or 504 that clears up within a second or two, 
 
 - Only GET, HEAD, PUT and DELETE are retried. POST isn't, since repeating it might do something twice, like sending a mail.
 - If ESI sends `Retry-After`, esirb waits that long instead. If it asks for more than 10 seconds, esirb raises straight away rather than tie up your process.
-- Other errors, including 500, 4xx and the rate limits (420 and 429), aren't retried.
+- A 429 is retried after its `Retry-After`, if that's 10 seconds or less. A 429 without `Retry-After`, which some routes send from inside EVE's servers, or one asking for longer, is raised straight away.
+- When a failed response shows fewer than 20 errors left in ESI's [error limit](https://developers.eveonline.com/docs/services/esi/rate-limiting/), esirb stops retrying. Running out blocks every ESI route for your app until the window resets, and each failed retry counts as another error.
+- Other errors, including 500, other 4xx and 420, aren't retried.
 
-Set `retries` in `Esirb.configure` or per client to change the number, or to `0` to turn retries off. Worst case, a request takes about `(retries + 1) * timeout` seconds plus the waits, so lower `timeout` or `retries` together if that's too long.
+`retries` is the total for one request, whatever the reasons: with the default of 2, a request is sent at most 3 times. Set `retries` in `Esirb.configure` or per client to change the number, or to `0` to turn retries off. Worst case, a request takes about `(retries + 1) * timeout` seconds plus the waits, so lower `timeout` or `retries` together if that's too long.
+
+### Rate limits
+
+ESI limits requests in one of two ways, depending on the route ([details](https://developers.eveonline.com/docs/services/esi/rate-limiting/)). `Esirb::RateLimit` reads either from a response or an error:
+
+```ruby
+response = client.characters(123456789).location.get
+limit = Esirb::RateLimit.new(response)
+limit.group     # => "char-location"
+limit.limit     # => 1200 tokens...
+limit.window    # => ...per 900 seconds
+limit.remaining # => 1195
+limit.used      # => 2, what this request cost
+
+# On routes still using the older error limit:
+limit.error_limit_remaining # => 100 errors left in this window
+limit.error_limit_reset     # => 46 seconds until it resets
+
+# Errors carry the limits too:
+begin
+  client.characters(123456789).location.get
+rescue Esirb::ResponseError => e
+  e.rate_limit.remaining
+end
+```
+
+Values a route doesn't send are `nil`. Errors cost more than successful requests (5 tokens for a 4xx against 2 for a 2xx), so avoid repeating requests that fail. CCP also recommends slowing down as `remaining` nears zero, and staggering scheduled work rather than running it all at the same minute.
 
 ## Development
 

@@ -3,7 +3,9 @@
 ### Changed
 
 - Requires Ruby 3.3 or newer.
-- GET, HEAD, PUT and DELETE requests are retried up to twice after a 502, 503 or 504, a timeout or a connection failure, honoring `Retry-After`. esirb now depends on `faraday-retry`.
+- GET, HEAD, PUT and DELETE requests are retried up to twice after a 502, 503 or 504, a timeout or a connection failure, honoring `Retry-After`.
+- 420 raises `Esirb::ErrorLimited` and 429 raises `Esirb::TooManyRequests`, both subclasses of `Esirb::RateLimited`.
+- A 429 is retried after its `Retry-After` when that's 10 seconds or less, and nothing is retried once fewer than 20 errors are left in ESI's error limit window.
 - 502, 503 and 504 raise `Esirb::BadGateway`, `Esirb::ServiceUnavailable` and `Esirb::GatewayTimeout`, which are subclasses of `Esirb::ServerError`.
 - Requests time out after 30 seconds waiting for a response and 5 seconds opening the connection. Before, they used the adapter's defaults (60 seconds each for Net::HTTP).
 - The default ESI compatibility date is `2026-08-18` (was `2026-06-09`). Set `compatibility_date` to keep the old one.
@@ -31,6 +33,7 @@
 
 - `Esirb.configure` sets defaults for new clients: `base_url`, `compatibility_date`, `tenant`, `language`, `user_agent` and `cache_store`. Each can also be passed to `Esirb::Client.new`.
 - Authenticated responses (`Cache-Control: private`) are cached per access token.
+- `Esirb::RateLimit` reads ESI's rate limit and error limit headers from a response, and `Esirb::ResponseError#rate_limit` from an error.
 - A `retries` option (default 2; 0 turns retries off).
 - `timeout` and `open_timeout` options, and a `faraday` option or client block for adding middleware, changing the adapter or setting other connection options.
 - `token:` accepts a callable, which is called before every request, so a long-lived client can use your app's refreshed access tokens. A string still works as before.

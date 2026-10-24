@@ -222,111 +222,16 @@ RSpec.describe "Requests sent to ESI" do
     end
   end
 
+  # The retry rules are in retry_spec.rb; this checks the client uses them.
   describe "retries" do
-    let(:attempts) { [] }
-    let(:ok) { json_response({ players: 1 }) }
-
-    def busy(retry_after:)
-      json_response({ error: "busy" }, status: 503, headers: { "Retry-After" => retry_after })
-    end
-
-    # Answers each attempt at `path` with the next item: a status (as an error response), an
-    # exception class to raise, or a full response.
-    def respond_in_turn(verb, path, *answers)
-      stubs.public_send(verb, path) do |env|
-        attempts << env
-        answer = answers.shift || ok
-        raise answer, "boom" if answer.is_a?(Class)
-
-        answer.is_a?(Integer) ? json_response({ error: "busy" }, status: answer) : answer
-      end
-    end
-
-    { 502 => Esirb::BadGateway, 503 => Esirb::ServiceUnavailable, 504 => Esirb::GatewayTimeout }.each do |status, error|
-      it "retries a #{status} and returns the response that succeeds", :aggregate_failures do
-        respond_in_turn(:get, "/status", status, status)
-
-        expect(client.status.get.body).to eq("players" => 1)
-        expect(attempts.size).to eq 3
+    it "retries a transient error and returns the response that succeeds" do
+      attempts = 0
+      stubs.get("/status") do
+        attempts += 1
+        attempts == 1 ? json_response({ error: "busy" }, status: 503) : json_response({ players: 1 })
       end
 
-      it "raises #{error} after the last retry", :aggregate_failures do
-        respond_in_turn(:get, "/status", status, status, status)
-
-        expect { client.status.get }.to raise_error(error)
-        expect(attempts.size).to eq 3
-      end
-    end
-
-    { Faraday::TimeoutError => "a timeout", Faraday::ConnectionFailed => "a connection failure" }.each do |raised, name|
-      it "retries #{name}", :aggregate_failures do
-        respond_in_turn(:get, "/status", raised)
-
-        expect(client.status.get.body).to eq("players" => 1)
-        expect(attempts.size).to eq 2
-      end
-    end
-
-    [500, 404, 420].each do |status|
-      it "doesn't retry a #{status}", :aggregate_failures do
-        respond_in_turn(:get, "/status", status)
-
-        expect { client.status.get }.to raise_error(Esirb::ResponseError)
-        expect(attempts.size).to eq 1
-      end
-    end
-
-    it "retries PUT and DELETE, which are safe to repeat" do
-      respond_in_turn(:put, "/characters/1/settings", 503)
-      respond_in_turn(:delete, "/characters/1/settings", 503)
-      client.characters(1).settings.put(body: [1])
-      client.characters(1).settings.delete
-
-      expect(attempts.size).to eq 4
-    end
-
-    it "doesn't retry POST, which might not be safe to repeat", :aggregate_failures do
-      respond_in_turn(:post, "/characters/1/contacts", 503)
-
-      expect { client.characters(1).contacts.post(body: [2]) }.to raise_error(Esirb::ServiceUnavailable)
-      expect(attempts.size).to eq 1
-    end
-
-    it "waits as long as ESI's Retry-After asks" do
-      respond_in_turn(:get, "/status", busy(retry_after: "0.2"))
-      started = Process.clock_gettime(Process::CLOCK_MONOTONIC)
-      client.status.get
-
-      expect(Process.clock_gettime(Process::CLOCK_MONOTONIC) - started).to be >= 0.2
-    end
-
-    it "raises straight away when Retry-After asks for longer than 10 seconds", :aggregate_failures do
-      respond_in_turn(:get, "/status", busy(retry_after: "60"))
-
-      expect { client.status.get }.to raise_error(Esirb::ServiceUnavailable)
-      expect(attempts.size).to eq 1
-    end
-
-    context "with retries: 0" do
-      let(:client) { Esirb::Client.new(retries: 0) }
-
-      it "sends each request once", :aggregate_failures do
-        respond_in_turn(:get, "/status", 503)
-
-        expect { client.status.get }.to raise_error(Esirb::ServiceUnavailable)
-        expect(attempts.size).to eq 1
-      end
-    end
-
-    context "with retries set in Esirb.configure" do
-      before { Esirb.configure { |config| config.retries = 1 } }
-
-      it "uses that many", :aggregate_failures do
-        respond_in_turn(:get, "/status", 503, 503)
-
-        expect { client.status.get }.to raise_error(Esirb::ServiceUnavailable)
-        expect(attempts.size).to eq 2
-      end
+      expect(client.status.get.body).to eq("players" => 1)
     end
   end
 
