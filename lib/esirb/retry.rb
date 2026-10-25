@@ -10,10 +10,11 @@ module Esirb
     # Usually transient: ESI tends to recover within a second or two.
     TRANSIENT = [BadGateway, ServiceUnavailable, GatewayTimeout, TimeoutError, ConnectionFailed].freeze
     # Safe to repeat. POST isn't, since it might do something twice, like sending a mail.
-    METHODS = %i[delete get head options put].freeze
+    METHODS = %i[delete get head put].freeze
     # Longest Retry-After worth waiting for, in seconds. Anything longer is raised for the app to handle.
     MAX_WAIT = 10
 
+    # A method of its own, so specs can skip the wait.
     def self.pause(seconds)
       sleep(seconds)
     end
@@ -43,7 +44,7 @@ module Esirb
       return retry_after(error) if error.is_a?(TooManyRequests)
       return unless TRANSIENT.any? { |error_class| error.is_a?(error_class) }
 
-      retry_after?(error) ? retry_after(error) : backoff(attempt)
+      retry_after_header?(error) ? retry_after(error) : backoff(attempt)
     end
 
     def retry_allowed?(env, error, attempt)
@@ -60,13 +61,13 @@ module Esirb
       0.5 * (2**attempt) * (1 + (rand * 0.5))
     end
 
-    def retry_after?(error)
+    def retry_after_header?(error)
       error.is_a?(ResponseError) && !error.headers["Retry-After"].nil?
     end
 
     # ESI's Retry-After, or nil if it's missing or too long to wait for.
     def retry_after(error)
-      seconds = Float(error.headers["Retry-After"], exception: false) if retry_after?(error)
+      seconds = Float(error.headers["Retry-After"], exception: false) if retry_after_header?(error)
       seconds if seconds && seconds <= MAX_WAIT
     end
   end

@@ -55,21 +55,21 @@ Treat ESI static paths as method names, and path parameters as the arguments for
 ```ruby
 
 path = client.route(3000142, 30002187)
-path.string # => "/route/3000142/30002187"
+path.to_s # => "/route/3000142/30002187"
 
 path = client.ui.autopilot.waypoint
-path.string # => "/ui/autopilot/waypoint"
+path.to_s # => "/ui/autopilot/waypoint"
 
 path = client.characters(123456789).location
-path.string # => "/characters/123456789/location"
+path.to_s # => "/characters/123456789/location"
 ```
 
 Each call returns a new path, so you can reuse part of one:
 
 ```ruby
 character = client.characters(123456789)
-character.location.string # => "/characters/123456789/location"
-character.skills.string   # => "/characters/123456789/skills"
+character.location.to_s # => "/characters/123456789/location"
+character.skills.to_s   # => "/characters/123456789/skills"
 ```
 
 Path params can be strings, symbols or integers, and are URL-encoded. Query params don't go in the path; pass them to the HTTP verb with `params:`.
@@ -77,13 +77,13 @@ Path params can be strings, symbols or integers, and are URL-encoded. Query para
 Some ESI segments, like `freelance-jobs`, use hyphens, which Ruby method names can't contain. Call them with underscores instead:
 
 ```ruby
-client.characters(123456789).freelance_jobs.string # => "/characters/123456789/freelance-jobs"
+client.characters(123456789).freelance_jobs.to_s # => "/characters/123456789/freelance-jobs"
 ```
 
 esirb keeps a list of ESI's hyphenated segments, and only those names are converted. Segments that really use underscores, like `system_kills`, stay as they are. For a segment esirb doesn't know about yet, add it exactly as written with `segment`:
 
 ```ruby
-client.characters(123456789).segment("new-thing", 42).string # => "/characters/123456789/new-thing/42"
+client.characters(123456789).segment("new-thing", 42).to_s # => "/characters/123456789/new-thing/42"
 ```
 
 ### Make the request, with any query parameters or body

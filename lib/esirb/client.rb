@@ -22,10 +22,8 @@ module Esirb
     # token: an ESI access token, or something that responds to call and returns one. A callable
     # is asked before every request, so an app can refresh its token without building a new client.
     #
-    # Options not given here come from Esirb.configuration: base_url, compatibility_date, tenant,
-    # language, user_agent, cache_store, timeout, open_timeout, retries and faraday. A nil tenant or
-    # language leaves that header out, and a nil cache_store turns caching off. compatibility_date
-    # must be a YYYY-MM-DD string or a Date: without one, ESI would use its oldest behavior.
+    # Other options default to Esirb.configuration. compatibility_date can't be nil: without one,
+    # ESI would use its oldest behavior.
     #
     # A block is called with the Faraday connection builder after the configured faraday hook, so
     # it can add middleware or change the adapter for this client only.
@@ -57,7 +55,7 @@ module Esirb
 
     def build_connection(block)
       # ESI reads array params as repeated keys (categories=a&categories=b), not Faraday's default
-      # categories[]=a&categories[]=b. Checked live against /characters/{id}/search (MP-230).
+      # categories[]=a&categories[]=b.
       request = { timeout:, open_timeout:, params_encoder: Faraday::FlatParamsEncoder }.compact
       Faraday.new(base_url, request:) do |c|
         use_middleware(c)
@@ -98,20 +96,19 @@ module Esirb
 
       check_callable(:faraday, options[:faraday])
       check_retries(options.fetch(:retries, 0))
-      check_callable(:token, token, strings: true)
+      check_callable(:token, token, allow_string: true)
     end
 
-    # A request without a date gets ESI's oldest behavior, so a missing date is an error, not a default.
     def check_retries(retries)
       return if retries.is_a?(Integer) && retries >= 0
 
       raise ArgumentError, "retries must be an Integer of 0 or more, got #{retries.inspect}"
     end
 
-    def check_callable(name, value, strings: false)
-      return if value.nil? || value.respond_to?(:call) || (strings && value.is_a?(String))
+    def check_callable(name, value, allow_string: false)
+      return if value.nil? || value.respond_to?(:call) || (allow_string && value.is_a?(String))
 
-      expected = strings ? "a string or something that responds to call" : "something that responds to call"
+      expected = allow_string ? "a string or something that responds to call" : "something that responds to call"
       raise ArgumentError, "#{name} must be #{expected}, got #{value.class}"
     end
 

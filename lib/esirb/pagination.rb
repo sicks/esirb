@@ -14,13 +14,13 @@ module Esirb
     # refreshed the data between pages, so this starts over once, and raises PagesChanged if it happens again.
     def get_all_pages(params: {}, headers: nil)
       2.times do
-        records = fetch_all_pages(params, headers)
+        records = pages_unless_changed(params, headers)
         return records if records
       end
-      raise PagesChanged, "#{string} changed while its pages were being fetched, twice in a row"
+      raise PagesChanged, "#{self} changed while its pages were being fetched, twice in a row"
     end
 
-    # Records from a route paginated with `before` and `after` cursor tokens, e.g. freelance jobs,
+    # Records from a route paginated with `before` and `after` cursors, e.g. freelance jobs,
     # oldest first, as [records, after]. Save `after` and pass it back later to get only the records
     # created or changed since. Without it, this fetches everything.
     #
@@ -38,8 +38,8 @@ module Esirb
       from_id = nil
       loop do
         page = from_id_page(from_id, id_key, params, headers)
-        known = stop_at && page.index { |record| record[id_key] == stop_at }
-        return records + page.first(known) if known
+        stop_index = stop_at && page.index { |record| record[id_key] == stop_at }
+        return records + page.first(stop_index) if stop_index
         return records if page.empty?
 
         records.concat(page)
@@ -49,13 +49,12 @@ module Esirb
 
     private
 
-    # nil when Last-Modified changed between pages.
-    def fetch_all_pages(params, headers)
-      first = get(params: params.merge(page: 1), headers:)
-      records = first.body.dup
-      (2..first.headers["X-Pages"].to_i).each do |page|
+    def pages_unless_changed(params, headers)
+      first_page = get(params: params.merge(page: 1), headers:)
+      records = first_page.body.dup
+      (2..first_page.headers["X-Pages"].to_i).each do |page|
         response = get(params: params.merge(page:), headers:)
-        return nil unless response.headers["Last-Modified"] == first.headers["Last-Modified"]
+        return nil unless response.headers["Last-Modified"] == first_page.headers["Last-Modified"]
 
         records.concat(response.body)
       end

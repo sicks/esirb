@@ -20,8 +20,8 @@ module Esirb
       # Seconds to wait for a response, and to open the connection. nil leaves it to the adapter.
       timeout: 30,
       open_timeout: 5,
-      # Times to retry a request that failed with a 502, 503 or 504, a timeout or a connection
-      # failure. Only GET, HEAD, PUT and DELETE are retried. 0 turns retries off.
+      # Times to retry a 502, 503 or 504, a timeout, a connection failure or a short 429, on GET,
+      # HEAD, PUT and DELETE. Retries stop when ESI's error limit is nearly used up. 0 turns them off.
       retries: 2,
       # Called with the Faraday connection builder after esirb's own setup, to add middleware,
       # change the adapter or set other connection options.
@@ -34,20 +34,24 @@ module Esirb
       DEFAULTS.each { |name, value| public_send(:"#{name}=", value) }
     end
 
+    # The settings, keyed like DEFAULTS.
     def to_h
       DEFAULTS.keys.to_h { |name| [name, public_send(name)] }
     end
   end
 
   class << self
+    # The defaults new clients start from.
     def configuration
       @configuration ||= Configuration.new
     end
 
+    # Changes the defaults for clients created afterwards.
     def configure
       yield configuration
     end
 
+    # Restores esirb's own defaults; mainly useful in tests.
     def reset_configuration!
       @configuration = Configuration.new
     end

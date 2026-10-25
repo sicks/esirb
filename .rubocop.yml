@@ -16,7 +16,7 @@ Metrics/BlockLength:
   Exclude:
     - "spec/**/*"
 
-# Examples with several expectations are tagged :aggregate_failures instead.
+# Some examples need real setup, like two clients sharing a store.
 RSpec/ExampleLength:
   Max: 12
 

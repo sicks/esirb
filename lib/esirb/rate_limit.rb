@@ -13,7 +13,13 @@ module Esirb
     # With fewer errors than this left in the error limit window, esirb stops retrying, and with a
     # cache store stops sending requests: running out blocks every ESI route until the window resets.
     ERROR_LIMIT_FLOOR = 20
-    COUNT_HEADERS = %w[X-Ratelimit-Remaining X-Ratelimit-Used X-ESI-Error-Limit-Remain X-ESI-Error-Limit-Reset].freeze
+    # Each reader and the header its whole-number value comes from.
+    HEADERS_BY_READER = {
+      remaining: "X-Ratelimit-Remaining",
+      used: "X-Ratelimit-Used",
+      error_limit_remaining: "X-ESI-Error-Limit-Remain",
+      error_limit_reset: "X-ESI-Error-Limit-Reset"
+    }.freeze
 
     # group, limit (tokens per window), window (seconds), remaining and used (what this request
     # cost) come from the rate limit; error_limit_remaining and error_limit_reset (seconds until
@@ -26,8 +32,7 @@ module Esirb
 
       @group = headers["X-Ratelimit-Group"]
       @limit, @window = parse_limit(headers["X-Ratelimit-Limit"])
-      @remaining, @used, @error_limit_remaining, @error_limit_reset =
-        COUNT_HEADERS.map { |name| integer(headers[name]) }
+      HEADERS_BY_READER.each { |reader, header| instance_variable_set(:"@#{reader}", integer(headers[header])) }
     end
 
     # Whether the error limit is nearly used up. Routes on the newer rate limit don't send error
