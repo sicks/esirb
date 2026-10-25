@@ -1,5 +1,9 @@
 ## [Unreleased]
 
+## [0.4.0] - 2026-10-25
+
+Almost every part of esirb changed in this release, and much of it is **not backwards compatible** with 0.3.0. Read the Changed and Removed sections before upgrading.
+
 ### Changed
 
 - Requires Ruby 3.3 or newer.
@@ -58,6 +62,41 @@
 - The `cache:` client option. Pass `cache_store: nil` to turn caching off for one client.
 - `Esirb::Client::BASE_URL` and `Esirb::Client::DEFAULT_HEADERS`. Use `Esirb.configuration` or the client's readers (`base_url`, `compatibility_date`, ...).
 - The `trace` HTTP verb. ESI doesn't support it, and `trace` now works as a path segment.
+- The `sig/esirb.rbs` type signatures, which only declared `VERSION`.
+
+## [0.3.0] - 2026-07-30
+
+### Fixed
+
+- The `tenant:` and `language:` client options are sent as `X-Tenant` and `Accept-Language`. Before, they were accepted but ignored, and the defaults were always sent.
+
+### Added
+
+- Specs for the client and paths.
+
+## [0.2.2] - 2026-07-01
+
+### Added
+
+- `raise_errors:` client option (default `true`): error statuses raise Faraday's errors.
+
+## [0.2.1] - 2026-07-01
+
+### Fixed
+
+- `faraday` and `faraday-http-cache` are declared as runtime dependencies, so installing esirb installs them.
+
+## [0.2.0] - 2026-07-01
+
+### Added
+
+- `Esirb::Client` and `Esirb::Path`: build an ESI path by chaining method calls (`client.characters(123).location`), then send it with an HTTP verb, passing `params:`, `body:` and `headers:`.
+- `token:`, `tenant:`, `language:`, `cache:` and `cache_store:` client options, with responses cached through faraday-http-cache.
+- A README.
+
+### Changed
+
+- The gem is named `esirb` (it started as `ruby_esi`).
 
 ## [0.1.0] - 2026-06-04
 

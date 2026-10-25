@@ -1,8 +1,27 @@
 # Esirb
 
-Esirb is a light wrapper around Faraday for the purposes of interacting with Eve Online's Swagger API.
+Esirb is a light wrapper around Faraday for the purposes of interacting with EVE Online's ESI API.
 
 I wanted something low maintenance, so this gem makes a few assumptions to let you dynamically generate any path that might end up on the ESI.
+
+## Contents
+
+- [Installation](#installation)
+- [Usage](#usage)
+  - [Quick start](#quick-start)
+  - [Create a client](#create-a-client)
+  - [Build the path](#build-the-path)
+  - [Make the request](#make-the-request)
+  - [Pagination](#pagination)
+  - [Configuration](#configuration)
+  - [Customizing the connection](#customizing-the-connection)
+  - [Caching](#caching)
+  - [Errors](#errors)
+  - [Retries](#retries)
+  - [Rate limits](#rate-limits)
+- [Development](#development)
+- [Contributing](#contributing)
+- [License](#license)
 
 ## Installation
 
@@ -20,14 +39,23 @@ gem install esirb
 
 ## Usage
 
+### Quick start
+
+```ruby
+client = Esirb::Client.new
+alliance_ids = client.alliances.get.body # => [99000006, 99000008, ...]
+```
 
 ### Create a client
+
 ```ruby
 client = Esirb::Client.new
 ```
 
 A client holds no state from building paths or making requests, so one client can be shared between threads.
-##### Create a client with a token
+
+#### Create a client with a token
+
 ```ruby
 client = Esirb::Client.new(token: "...")
 ```
@@ -40,22 +68,22 @@ client = Esirb::Client.new(token: -> { character.access_token_refreshing_if_expi
 
 esirb doesn't refresh tokens itself: your app keeps the refresh token and does the refresh, and esirb only asks for the access token. If the callable returns `nil` or a blank string, the request raises `Esirb::Error` instead of being sent.
 
-##### Identify your app
+#### Identify your app
+
 CCP asks every ESI client to send a User-Agent with the app's name and a way to contact you. Pass yours as `user_agent:`, and esirb adds its own name after it:
 
 ```ruby
 client = Esirb::Client.new(user_agent: "mappy/1.2 (admin@example.com)")
-client.user_agent # => "mappy/1.2 (admin@example.com) esirb/0.3.0 (+https://github.com/sicks/esirb)"
+client.user_agent # => "mappy/1.2 (admin@example.com) esirb/0.4.0 (+https://github.com/sicks/esirb)"
 ```
 
-### Build the path, with any path parameters
+### Build the path
 
-Treat ESI static paths as method names, and path parameters as the arguments for those methods. Chain these methods to build the path to the desired ESI endpoint.
+Treat ESI's static path segments as method names, and path parameters as the arguments for those methods. Chain these methods to build the path to the desired ESI route.
 
 ```ruby
-
-path = client.route(3000142, 30002187)
-path.to_s # => "/route/3000142/30002187"
+path = client.route(30000142, 30002187)
+path.to_s # => "/route/30000142/30002187"
 
 path = client.ui.autopilot.waypoint
 path.to_s # => "/ui/autopilot/waypoint"
@@ -86,30 +114,29 @@ esirb keeps a list of ESI's hyphenated segments, and only those names are conver
 client.characters(123456789).segment("new-thing", 42).to_s # => "/characters/123456789/new-thing/42"
 ```
 
-### Make the request, with any query parameters or body
+### Make the request
 
-Call an http verb, optionally passing `params`, `body` or `headers`.
+Call an HTTP verb on the path: `get`, `head`, `post`, `put`, `patch` or `delete`. Each returns a `Faraday::Response`, with JSON bodies already parsed.
 
 ```ruby
-resp = path.get # => #<Faraday::Response>
-resp.status # => 204
-resp.body # => { "solar_system_id": 30000142 }
+client = Esirb::Client.new(token: -> { character.access_token }) # needs the esi-location.read_location.v1 scope
+resp = client.characters(123456789).location.get
+resp.status # => 200
+resp.body   # => { "solar_system_id" => 30000142 }
+```
 
-# check ESI documentation to know whether you need to pass query parameters, or a body
-resp = path.post(params:, body:, headers:)
+Pass query parameters with `params:`, a body with `body:` (sent as JSON), and extra headers with `headers:`. The [API Explorer](https://developers.eveonline.com/api-explorer) lists what each route takes.
+
+```ruby
+client.markets(10000002).orders.get(params: { type_id: 34, order_type: "sell" })
+client.universe.names.post(body: [30000142, 30002187])
 ```
 
 Headers passed to a verb are added to the client's default headers, and replace a default with the same name.
 
-### All together now
-```ruby
-client = Esirb::Client.new
-list_of_alliance_ids = client.alliances.get.body # => [...]
-```
-
 ### Pagination
 
-ESI splits long lists into pages, using [one of three styles](https://developers.eveonline.com/docs/services/esi/pagination/x-pages/) depending on the route. You can tell which from the route's query parameters in ESI's API Explorer:
+ESI splits long lists into pages, using one of three styles depending on the route. You can tell which from the route's query parameters in ESI's API Explorer:
 
 | The route takes | Style | Use | Typical routes |
 |---|---|---|---|
@@ -117,9 +144,9 @@ ESI splits long lists into pages, using [one of three styles](https://developers
 | `before` and `after` | Cursor | `get_by_cursor` | freelance jobs, corporation projects, Paragon hub |
 | `from_id` | From-ID | `get_from_id` | wallet transactions |
 
-All three send their requests one at a time, never in parallel. Each request goes through esirb's cache, retries and error-limit guard like any other, and keeps the `params:` and `headers:` you pass. If any request fails, the error is raised and nothing is returned.
+Each helper makes as many requests as it takes to collect the pages, so one call can be dozens of requests, each counting toward ESI's rate limit. They're sent one at a time, never in parallel. Each request goes through esirb's cache, retries and error-limit guard like any other, and keeps the `params:` and `headers:` you pass. If any request fails, the error is raised and nothing is returned.
 
-#### `get_all_pages`: numbered pages
+#### `get_all_pages`: X-Pages ([ESI docs](https://developers.eveonline.com/docs/services/esi/pagination/x-pages/))
 
 ```ruby
 orders = client.markets(10000002).orders.get_all_pages(params: { type_id: 34 })
@@ -146,7 +173,7 @@ end
 
 Every page of one list should have the same `Last-Modified`. A different one means ESI refreshed the data partway through, so the pages would mix old and new records. `get_all_pages` then starts over from page 1 once, and raises `Esirb::PagesChanged` if it happens again. Fetching the whole list takes as many requests as there are pages, or up to twice that if it has to start over.
 
-#### `get_by_cursor`: before and after cursors
+#### `get_by_cursor`: Cursor ([ESI docs](https://developers.eveonline.com/docs/services/esi/pagination/cursor-based/))
 
 These responses aren't a plain list. They're an object holding the records under a key that depends on the route (`freelance_jobs`, `projects`, `listings`...), plus a `cursor` with two values: `before`, pointing at older records, and `after`, pointing at newer ones. `get_by_cursor` finds the records' key for you. There are two ways to call it.
 
@@ -203,12 +230,15 @@ end
 
 `after` and `before` values stay valid for days, according to CCP. Pass them back exactly as you got them, without trying to decode them. A record can show up on more than one page, for example when it changed while the pages were being fetched. `get_by_cursor` returns each record once, matched by its `id`: when following `before` toward older records it keeps the copy it already had, and when following `after` toward newer records it keeps the newest copy.
 
-#### `get_from_id`: newest to oldest
+#### `get_from_id`: From-ID ([ESI docs](https://developers.eveonline.com/docs/services/esi/pagination/from-id/))
+
+ESI returns the newest records first. To get older ones, you pass the oldest ID you've seen as `from_id`. `get_from_id` does that for you, one request after another, so you never pass `from_id` yourself.
+
+**Everything, newest first:**
 
 ```ruby
 transactions = client.characters(123456789).wallet.transactions
-all = transactions.get_from_id                             # newest first
-newer = transactions.get_from_id(stop_at: newest_known_id) # only the ones after an ID you already have
+all = transactions.get_from_id
 ```
 
 Done by hand:
@@ -226,7 +256,33 @@ loop do
 end
 ```
 
-With `stop_at:`, `get_from_id` stops as soon as it reaches that ID and returns only the records before it. If the ID is on the first page, that's one request. Records are identified by `transaction_id`, which is what wallet transactions use. Pass `id_key:` if a route uses a different field.
+**Only records newer than one you already have:**
+
+```ruby
+newer = transactions.get_from_id(stop_at: newest_known_id)
+```
+
+Done by hand:
+
+```ruby
+newer = []
+from_id = nil
+
+loop do
+  params = from_id ? { from_id: } : {}
+  page = transactions.get(params:).body.reject { |record| record["transaction_id"] == from_id }
+  stop_index = page.index { |record| record["transaction_id"] == newest_known_id }
+  break newer.concat(page.first(stop_index)) if stop_index
+  break if page.empty?
+
+  newer.concat(page)
+  from_id = page.last["transaction_id"]
+end
+```
+
+`stop_at` is esirb's option, not an ESI parameter: an ID you already have, usually the newest one you stored last time. The walk ends when it reaches that record, which isn't included. If it's on the first page, that's one request. If ESI no longer has it, the walk fetches everything.
+
+Records are identified by `transaction_id`, which is what wallet transactions use. Pass `id_key:` if a route uses a different field.
 
 ### Configuration
 
@@ -265,6 +321,10 @@ Options passed to `Esirb::Client.new` override these for that client:
 
 Setting `tenant` or `language` to `nil` leaves that header out. `token` is set per client only.
 
+#### Compatibility dates
+
+ESI changes a route's responses only under a new compatibility date, and a request without a date gets ESI's oldest behavior, so esirb always sends one. New fields and enum values can still appear within a date, so don't fail on ones you don't recognize. To move to a newer date, check ESI's changes since your current one against your code, then set `compatibility_date`. A new esirb version can move the default date; the CHANGELOG says when.
+
 ### Customizing the connection
 
 esirb uses [Faraday](https://lostisland.github.io/faraday/). To add middleware, change the adapter or set other connection options, give `Esirb.configure` a `faraday` callable, or pass a block to a client. Both receive the Faraday connection builder after esirb has set up its own middleware:
@@ -282,6 +342,8 @@ client = Esirb::Client.new { |f| f.adapter :net_http_persistent }
 ### Caching
 
 esirb caches responses only when you give it a `cache_store`, usually once in `Esirb.configure` so every client shares it. Any object with `read`, `write` and `delete` works, such as `Rails.cache` or another `ActiveSupport::Cache` store.
+
+Without a `cache_store`, every request goes to ESI, even when the last response is still fresh. CCP asks apps not to request data again before its `Expires` time or work around ESI's cache, and doing that can get an app banned, so set a store in production. The store also lets esirb [pause before the error limit runs out](#pausing-before-the-error-limit-runs-out).
 
 ```ruby
 Esirb.configure do |config|
@@ -328,6 +390,8 @@ end
 | `Esirb::ConnectionFailed` | The connection to ESI failed, including TLS errors and timeouts while connecting |
 | `Esirb::TimeoutError` | ESI connected but didn't answer within `timeout` |
 | `Esirb::ErrorLimitReached` | Raised *without sending the request*, while ESI's error limit is nearly used up (needs a `cache_store`; see [Rate limits](#rate-limits)). `retry_after` gives the seconds until it resets. |
+
+Error responses aren't free: a 4xx costs 5 rate limit tokens and counts toward ESI's [error limit](https://developers.eveonline.com/docs/services/esi/rate-limiting/), so don't keep repeating a request that fails.
 
 Everything esirb raises is an `Esirb::Error`. When an error status is a normal answer, rescue its class. For example, ESI returns 404 for a character's fleet when they aren't in one:
 
@@ -396,11 +460,13 @@ ESI counts the error limit per IP address, so esirb keeps one count per ESI host
 
 After checking out the repo, run `bin/setup` to install dependencies. Then, run `rake spec` to run the tests. You can also run `bin/console` for an interactive prompt that will allow you to experiment.
 
+After moving esirb's default compatibility date, run `bundle exec rake esi:check_segments` to compare esirb's list of hyphenated segments with ESI's OpenAPI spec.
+
 To install this gem onto your local machine, run `bundle exec rake install`. To release a new version, update the version number in `version.rb`, and then run `bundle exec rake release`, which will create a git tag for the version, push git commits and the created tag, and push the `.gem` file to [rubygems.org](https://rubygems.org).
 
 ## Contributing
 
-Bug reports and pull requests are welcome on GitHub at https://github.com/[USERNAME]/esirb.
+Bug reports and pull requests are welcome on GitHub at https://github.com/sicks/esirb.
 
 ## License
 
