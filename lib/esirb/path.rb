@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require "erb"
+require_relative "pagination"
 
 module Esirb
   # An ESI endpoint path built by chaining method calls, sent with an HTTP verb method.
@@ -11,6 +12,8 @@ module Esirb
   #   character.location.string # => "/characters/123/location"
   #   character.skills.string   # => "/characters/123/skills"
   class Path
+    include Pagination
+
     VERBS = %i[get head delete post put patch].freeze
 
     # Method names that become path segments. Conversion hooks like to_ary and to_str are left to Ruby.

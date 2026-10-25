@@ -56,6 +56,10 @@ module Esirb
     end
   end
 
+  # Raised by Path#get_all_pages when ESI refreshed the data while its pages were being fetched,
+  # twice in a row, so the pages can't be combined consistently. Trying again later usually works.
+  class PagesChanged < Error; end
+
   # Any 4xx status without its own class.
   class ClientError < ResponseError; end
 
