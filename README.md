@@ -132,10 +132,10 @@ Under the hood, that's the same as fetching the pages yourself:
 orders = client.markets(10000002).orders
 
 first = orders.get(params: { type_id: 34, page: 1 })
-pages = first.headers["X-Pages"].to_i # total number of pages; missing means just one
+total_pages = first.headers["X-Pages"].to_i
 records = first.body
 
-(2..pages).each do |page|
+(2..total_pages).each do |page|
   response = orders.get(params: { type_id: 34, page: })
   # get_all_pages also checks this, and starts over from page 1 if it doesn't match:
   raise "data changed between pages" unless response.headers["Last-Modified"] == first.headers["Last-Modified"]
