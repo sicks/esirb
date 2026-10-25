@@ -107,6 +107,34 @@ client = Esirb::Client.new
 list_of_alliance_ids = client.alliances.get.body # => [...]
 ```
 
+### Pagination
+
+ESI splits long lists into pages in [one of three ways](https://developers.eveonline.com/docs/services/esi/pagination/x-pages/), depending on the route. Its API Explorer shows which by the route's parameters. esirb has a helper for each; they fetch pages one at a time, and keep your `params:` and `headers:` on every page.
+
+**`page` and the `X-Pages` header** (most routes, e.g. market orders, assets, contracts):
+
+```ruby
+orders = client.markets(10000002).orders.get_all_pages(params: { type_id: 34 })
+```
+
+All pages of one list should share a `Last-Modified`. If ESI refreshes the data partway through, esirb starts over once, and raises `Esirb::PagesChanged` if it happens again.
+
+**`before` and `after` cursors** (newer routes, e.g. freelance jobs, corporation projects):
+
+```ruby
+jobs, after = client.freelance_jobs.get_by_cursor              # everything, oldest first
+changed, after = client.freelance_jobs.get_by_cursor(after:)  # only what's new or changed since
+```
+
+Save `after` and pass it back later to get only the changes. Records that appear on more than one page are returned once, matched by `id`.
+
+**`from_id`** (wallet transactions):
+
+```ruby
+transactions = client.characters(123456789).wallet.transactions.get_from_id                # newest first
+newer = client.characters(123456789).wallet.transactions.get_from_id(stop_at: newest_known_id)
+```
+
 ### Configuration
 
 Set defaults for every new client once, for example in a Rails initializer:
