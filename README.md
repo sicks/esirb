@@ -126,23 +126,31 @@ orders = client.markets(10000002).orders.get_all_pages(params: { type_id: 34 })
 # => one array with every order from every page
 ```
 
-What it sends, for a list with 3 pages:
+Under the hood, that's the same as fetching the pages yourself:
 
-1. `GET /markets/10000002/orders?page=1&type_id=34`. ESI answers with the first page, an `X-Pages: 3` header giving the total, and a `Last-Modified` header.
-2. `GET …?page=2&type_id=34`, then
-3. `GET …?page=3&type_id=34`.
+```ruby
+orders = client.markets(10000002).orders
 
-It returns the pages' records combined, in page order. A list with no `X-Pages` header has a single page, so that's one request.
+first = orders.get(params: { type_id: 34, page: 1 })
+pages = first.headers["X-Pages"].to_i # total number of pages; missing means just one
+records = first.body
 
-Every page of one list should have the same `Last-Modified`. A different one means ESI refreshed the data partway through, so the pages would mix old and new records. When that happens, esirb stops and starts over from page 1 once. If it happens again, it raises `Esirb::PagesChanged`. A walk normally takes as many requests as there are pages, or up to twice that if it has to start over.
+(2..pages).each do |page|
+  response = orders.get(params: { type_id: 34, page: })
+  # get_all_pages also checks this, and starts over from page 1 if it doesn't match:
+  raise "data changed mid-walk" unless response.headers["Last-Modified"] == first.headers["Last-Modified"]
+
+  records.concat(response.body)
+end
+```
+
+Every page of one list should have the same `Last-Modified`. A different one means ESI refreshed the data partway through, so the pages would mix old and new records. `get_all_pages` then starts over from page 1 once, and raises `Esirb::PagesChanged` if it happens again. A walk takes as many requests as there are pages, or up to twice that if it has to start over.
 
 #### `get_by_cursor`: before and after cursors
 
-These responses aren't a plain list. They're an object holding the records under a key that depends on the route (`freelance_jobs`, `projects`, `listings`...), plus a `cursor` with two values: `before`, pointing at older records, and `after`, pointing at newer ones. esirb finds the records' key for you.
+These responses aren't a plain list. They're an object holding the records under a key that depends on the route (`freelance_jobs`, `projects`, `listings`...), plus a `cursor` with two values: `before`, pointing at older records, and `after`, pointing at newer ones. `get_by_cursor` finds the records' key for you. There are two ways to call it.
 
-There are two ways to call it.
-
-**Everything.** Use this for a first sync:
+**Everything,** for a first sync:
 
 ```ruby
 jobs, after = client.freelance_jobs.get_by_cursor
@@ -150,40 +158,75 @@ jobs, after = client.freelance_jobs.get_by_cursor
 # after: save this to fetch only changes later
 ```
 
-1. `GET /freelance-jobs`, with no cursor. ESI answers with the most recent records and a `cursor`.
-2. `GET /freelance-jobs?before=<cursor.before>` brings the records just before those, with a new `cursor`.
-3. That repeats with each new `before` until a page comes back empty, or ESI stops sending a `before`.
+Done by hand, that's:
 
-The `after` it returns comes from the first response, so it marks where the list ended at the start.
+```ruby
+freelance_jobs = client.freelance_jobs
 
-**Only what changed since.** Use this to keep up to date:
+response = freelance_jobs.get # no cursor: the most recent records
+jobs = response.body["freelance_jobs"]
+after = response.body.dig("cursor", "after") # where the list ends now; save it for later
+before = response.body.dig("cursor", "before")
+
+while before
+  response = freelance_jobs.get(params: { before: })
+  older = response.body["freelance_jobs"]
+  break if older.empty?
+
+  jobs = older + jobs # get_by_cursor also skips records it already has, matched by id
+  before = response.body.dig("cursor", "before")
+end
+```
+
+**Only what changed since** a saved `after`, to keep up to date:
 
 ```ruby
 changed, after = client.freelance_jobs.get_by_cursor(after: saved_after)
 ```
 
-1. `GET /freelance-jobs?after=<saved_after>` brings records created or changed since then, with a new `cursor`.
-2. That repeats with each new `after` until a page comes back empty, or ESI stops sending an `after`.
+Done by hand:
 
-It returns those records, oldest first, and the `after` from the last page that had records (or `saved_after` itself, if nothing changed). Save it again for next time. CCP says these values stay valid for days. Pass them back exactly as you got them, without trying to decode them.
+```ruby
+changed = []
+after = saved_after
 
-A record can show up on more than one page, for example when it changed during the walk. esirb returns each record once, matched by its `id`. When walking back with `before`, it keeps the copy it already had. When following `after`, it keeps the newest copy.
+loop do
+  response = freelance_jobs.get(params: { after: })
+  newer = response.body["freelance_jobs"]
+  break if newer.empty?
+
+  changed += newer # get_by_cursor also replaces records it already has with these newer copies
+  after = response.body.dig("cursor", "after") || break
+end
+# Save `after` again for next time.
+```
+
+`after` and `before` values stay valid for days, according to CCP. Pass them back exactly as you got them, without trying to decode them. A record can show up on more than one page, for example when it changed during the walk. `get_by_cursor` returns each record once, matched by its `id`: when walking back with `before` it keeps the copy it already had, and when following `after` it keeps the newest copy.
 
 #### `get_from_id`: walking back from an ID
 
 ```ruby
 transactions = client.characters(123456789).wallet.transactions
-all = transactions.get_from_id                            # newest first
+all = transactions.get_from_id                             # newest first
 newer = transactions.get_from_id(stop_at: newest_known_id) # only the ones after an ID you already have
 ```
 
-What it sends:
+Done by hand:
 
-1. `GET /characters/123456789/wallet/transactions` brings the newest records, newest first.
-2. `GET …?from_id=<the last record's transaction_id>` brings that record again, followed by older ones. esirb drops the repeated record.
-3. That repeats until a page holds nothing older.
+```ruby
+records = transactions.get.body # the newest records, newest first
 
-With `stop_at:`, it stops as soon as it reaches that ID and returns only the records before it. If the ID is on the first page, that's one request. Records are identified by `transaction_id`, which is what wallet transactions use. Pass `id_key:` if a route uses a different field.
+loop do
+  from_id = records.last["transaction_id"]
+  # The response starts with the from_id record again, followed by older ones.
+  older = transactions.get(params: { from_id: }).body.reject { |record| record["transaction_id"] == from_id }
+  break if older.empty?
+
+  records.concat(older)
+end
+```
+
+With `stop_at:`, `get_from_id` stops as soon as it reaches that ID and returns only the records before it. If the ID is on the first page, that's one request. Records are identified by `transaction_id`, which is what wallet transactions use. Pass `id_key:` if a route uses a different field.
 
 ### Configuration
 
