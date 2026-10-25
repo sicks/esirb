@@ -10,8 +10,8 @@ I wanted something low maintenance, so this gem makes a few assumptions to let y
 - [Usage](#usage)
   - [Quick start](#quick-start)
   - [Create a client](#create-a-client)
-  - [Build the path](#build-the-path-with-any-path-parameters)
-  - [Make the request](#make-the-request-with-any-query-parameters-or-body)
+  - [Build the path](#build-the-path)
+  - [Make the request](#make-the-request)
   - [Pagination](#pagination)
   - [Configuration](#configuration)
   - [Customizing the connection](#customizing-the-connection)
@@ -77,7 +77,7 @@ client = Esirb::Client.new(user_agent: "mappy/1.2 (admin@example.com)")
 client.user_agent # => "mappy/1.2 (admin@example.com) esirb/0.4.0 (+https://github.com/sicks/esirb)"
 ```
 
-### Build the path, with any path parameters
+### Build the path
 
 Treat ESI's static path segments as method names, and path parameters as the arguments for those methods. Chain these methods to build the path to the desired ESI route.
 
@@ -114,7 +114,7 @@ esirb keeps a list of ESI's hyphenated segments, and only those names are conver
 client.characters(123456789).segment("new-thing", 42).to_s # => "/characters/123456789/new-thing/42"
 ```
 
-### Make the request, with any query parameters or body
+### Make the request
 
 Call an HTTP verb on the path: `get`, `head`, `post`, `put`, `patch` or `delete`. Each returns a `Faraday::Response`, with JSON bodies already parsed.
 
