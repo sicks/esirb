@@ -138,13 +138,13 @@ records = first.body
 (2..pages).each do |page|
   response = orders.get(params: { type_id: 34, page: })
   # get_all_pages also checks this, and starts over from page 1 if it doesn't match:
-  raise "data changed mid-walk" unless response.headers["Last-Modified"] == first.headers["Last-Modified"]
+  raise "data changed between pages" unless response.headers["Last-Modified"] == first.headers["Last-Modified"]
 
   records.concat(response.body)
 end
 ```
 
-Every page of one list should have the same `Last-Modified`. A different one means ESI refreshed the data partway through, so the pages would mix old and new records. `get_all_pages` then starts over from page 1 once, and raises `Esirb::PagesChanged` if it happens again. A walk takes as many requests as there are pages, or up to twice that if it has to start over.
+Every page of one list should have the same `Last-Modified`. A different one means ESI refreshed the data partway through, so the pages would mix old and new records. `get_all_pages` then starts over from page 1 once, and raises `Esirb::PagesChanged` if it happens again. Fetching the whole list takes as many requests as there are pages, or up to twice that if it has to start over.
 
 #### `get_by_cursor`: before and after cursors
 
@@ -201,9 +201,9 @@ end
 # Save `after` again for next time.
 ```
 
-`after` and `before` values stay valid for days, according to CCP. Pass them back exactly as you got them, without trying to decode them. A record can show up on more than one page, for example when it changed during the walk. `get_by_cursor` returns each record once, matched by its `id`: when walking back with `before` it keeps the copy it already had, and when following `after` it keeps the newest copy.
+`after` and `before` values stay valid for days, according to CCP. Pass them back exactly as you got them, without trying to decode them. A record can show up on more than one page, for example when it changed while the pages were being fetched. `get_by_cursor` returns each record once, matched by its `id`: when following `before` toward older records it keeps the copy it already had, and when following `after` toward newer records it keeps the newest copy.
 
-#### `get_from_id`: walking back from an ID
+#### `get_from_id`: newest to oldest
 
 ```ruby
 transactions = client.characters(123456789).wallet.transactions

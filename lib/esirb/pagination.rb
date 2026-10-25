@@ -11,7 +11,7 @@ module Esirb
     # Every record from a route paginated with `page` and the X-Pages header, e.g. market orders.
     #
     # All pages of one resource should share a Last-Modified. If it changes partway through, ESI
-    # refreshed the data mid-walk, so this starts over once, and raises PagesChanged if it happens again.
+    # refreshed the data between pages, so this starts over once, and raises PagesChanged if it happens again.
     def get_all_pages(params: {}, headers: nil)
       2.times do
         records = fetch_all_pages(params, headers)
@@ -25,7 +25,8 @@ module Esirb
     # created or changed since. Without it, this fetches everything.
     #
     # Records can repeat across pages; each appears once, matched by its "id": the newest copy when
-    # fetching changes, and the one already fetched when walking back through older pages.
+    # following `after` toward newer records, and the one already fetched when following `before`
+    # toward older records.
     def get_by_cursor(after: nil, params: {}, headers: nil)
       after ? cursor_changes(after, params, headers) : cursor_everything(params, headers)
     end

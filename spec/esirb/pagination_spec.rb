@@ -129,7 +129,7 @@ RSpec.describe Esirb::Pagination do
       end
     end
 
-    it "follows from_id back to the oldest record, newest first, without repeats" do
+    it "follows from_id from the newest record to the oldest, without repeats" do
       expect(ids(transactions.get_from_id, "transaction_id")).to eq [30, 29, 28, 27, 26]
     end
 
