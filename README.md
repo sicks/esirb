@@ -144,7 +144,7 @@ ESI splits long lists into pages, using one of three styles depending on the rou
 | `before` and `after` | Cursor | `get_by_cursor` | freelance jobs, corporation projects, Paragon hub |
 | `from_id` | From-ID | `get_from_id` | wallet transactions |
 
-All three send their requests one at a time, never in parallel. Each request goes through esirb's cache, retries and error-limit guard like any other, and keeps the `params:` and `headers:` you pass. If any request fails, the error is raised and nothing is returned.
+Each helper makes as many requests as it takes to collect the pages, so one call can be dozens of requests, each counting toward ESI's rate limit. They're sent one at a time, never in parallel. Each request goes through esirb's cache, retries and error-limit guard like any other, and keeps the `params:` and `headers:` you pass. If any request fails, the error is raised and nothing is returned.
 
 #### `get_all_pages`: X-Pages ([ESI docs](https://developers.eveonline.com/docs/services/esi/pagination/x-pages/))
 
@@ -232,10 +232,13 @@ end
 
 #### `get_from_id`: From-ID ([ESI docs](https://developers.eveonline.com/docs/services/esi/pagination/from-id/))
 
+ESI returns the newest records first. To get older ones, you pass the oldest ID you've seen as `from_id`. `get_from_id` does that for you, one request after another, so you never pass `from_id` yourself.
+
+**Everything, newest first:**
+
 ```ruby
 transactions = client.characters(123456789).wallet.transactions
-all = transactions.get_from_id                             # newest first
-newer = transactions.get_from_id(stop_at: newest_known_id) # only the ones after an ID you already have
+all = transactions.get_from_id
 ```
 
 Done by hand:
@@ -253,7 +256,33 @@ loop do
 end
 ```
 
-With `stop_at:`, `get_from_id` stops as soon as it reaches that ID and returns only the records before it. If the ID is on the first page, that's one request. Records are identified by `transaction_id`, which is what wallet transactions use. Pass `id_key:` if a route uses a different field.
+**Only records newer than one you already have:**
+
+```ruby
+newer = transactions.get_from_id(stop_at: newest_known_id)
+```
+
+Done by hand:
+
+```ruby
+newer = []
+from_id = nil
+
+loop do
+  params = from_id ? { from_id: } : {}
+  page = transactions.get(params:).body.reject { |record| record["transaction_id"] == from_id }
+  stop_index = page.index { |record| record["transaction_id"] == newest_known_id }
+  break newer.concat(page.first(stop_index)) if stop_index
+  break if page.empty?
+
+  newer.concat(page)
+  from_id = page.last["transaction_id"]
+end
+```
+
+`stop_at` is esirb's option, not an ESI parameter: an ID you already have, usually the newest one you stored last time. The walk ends when it reaches that record, which isn't included. If it's on the first page, that's one request. If ESI no longer has it, the walk fetches everything.
+
+Records are identified by `transaction_id`, which is what wallet transactions use. Pass `id_key:` if a route uses a different field.
 
 ### Configuration
 
