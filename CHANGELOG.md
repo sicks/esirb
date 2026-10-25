@@ -35,6 +35,7 @@
 
 - `Esirb.configure` sets defaults for new clients: `base_url`, `compatibility_date`, `tenant`, `language`, `user_agent` and `cache_store`. Each can also be passed to `Esirb::Client.new`.
 - Authenticated responses (`Cache-Control: private`) are cached per access token.
+- `rails generate esirb:install` writes `config/initializers/esirb.rb` with esirb's settings. esirb doesn't depend on Rails; the generator only loads when Rails runs it.
 - Pagination helpers for ESI's three pagination styles: `get_all_pages` (`page` and `X-Pages`, restarting if the data changes partway through), `get_by_cursor` (`before`/`after` cursors, returning the `after` token to save) and `get_from_id` (`from_id`).
 - With a `cache_store`, esirb stops sending requests while ESI's error limit is nearly used up (fewer than 20 errors left), across every client and process sharing the store, and raises `Esirb::ErrorLimitReached` with `retry_after` instead.
 - `Esirb::RateLimit` reads ESI's rate limit and error limit headers from a response, and `Esirb::ResponseError#rate_limit` from an error.
