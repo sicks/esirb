@@ -23,6 +23,7 @@
 - A client builds its Faraday connection when it's created instead of on first use, and keeps no state from building paths, so one client can be shared between threads.
 - Responses are cached only when a `cache_store` is set, in `Esirb.configure` or per client. Before, every client cached in its own unbounded in-memory store by default.
 - The cache stores raw response bodies as JSON instead of Marshal data.
+- Array query params are sent as repeated keys (`label_ids=1&label_ids=2`), which is what ESI reads, instead of Faraday's Rails-style `label_ids[]=1&label_ids[]=2`.
 - Responses with any JSON content type are parsed, including `+json` types like ESI's `application/openapi+json`. Before, only `application/json` was.
 - Errors are esirb's own classes instead of Faraday's: error statuses raise `Esirb::ResponseError` subclasses, and connection failures and timeouts raise `Esirb::ConnectionFailed` and `Esirb::TimeoutError`, with the Faraday error as the `cause`. Code that rescues `Faraday::Error` needs to rescue `Esirb::Error` instead.
 
