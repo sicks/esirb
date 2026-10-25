@@ -68,15 +68,6 @@ client = Esirb::Client.new(token: -> { character.access_token_refreshing_if_expi
 
 esirb doesn't refresh tokens itself: your app keeps the refresh token and does the refresh, and esirb only asks for the access token. If the callable returns `nil` or a blank string, the request raises `Esirb::Error` instead of being sent.
 
-#### Identify your app
-
-CCP asks every ESI client to send a User-Agent with the app's name and a way to contact you. Pass yours as `user_agent:`, and esirb adds its own name after it:
-
-```ruby
-client = Esirb::Client.new(user_agent: "mappy/1.2 (admin@example.com)")
-client.user_agent # => "mappy/1.2 (admin@example.com) esirb/0.4.0 (+https://github.com/sicks/esirb)"
-```
-
 ### Build the path
 
 Treat ESI's static path segments as method names, and path parameters as the arguments for those methods. Chain these methods to build the path to the desired ESI route.
@@ -312,7 +303,7 @@ Options passed to `Esirb::Client.new` override these for that client:
 | `compatibility_date` | `"2026-08-18"` | Sent as `X-Compatibility-Date`, as a `"YYYY-MM-DD"` string or a `Date`. A newer date can change response shapes, so check your code against it before switching. Any date up to today works (ESI's day starts at 11:00 UTC), and ESI uses the latest published date on or before it. It can't be in the future, or `nil`: without a date, ESI uses its oldest behavior. |
 | `tenant` | `"tranquility"` | Sent as `X-Tenant`. |
 | `language` | `"en"` | Sent as `Accept-Language`. |
-| `user_agent` | `nil` | Your app's name and contact info, sent before esirb's own User-Agent. |
+| `user_agent` | `nil` | Your app's name and contact info, which CCP asks every app to send. esirb adds its own after it: `"mappy/1.2 (admin@example.com) esirb/0.4.0 (+https://github.com/sicks/esirb)"`. |
 | `cache_store` | `nil` | Where to cache responses. `nil` turns caching off; see [Caching](#caching). |
 | `timeout` | `30` | Seconds to wait for a response. `nil` leaves it to the adapter. |
 | `open_timeout` | `5` | Seconds to wait to open the connection. `nil` leaves it to the adapter. |
