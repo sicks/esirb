@@ -9,8 +9,8 @@ module Esirb
   # Every call returns a new Path, so a partial path can be reused:
   #
   #   character = client.characters(123)
-  #   character.location.string # => "/characters/123/location"
-  #   character.skills.string   # => "/characters/123/skills"
+  #   character.location.to_s # => "/characters/123/location"
+  #   character.skills.to_s   # => "/characters/123/skills"
   class Path
     include Pagination
 
@@ -43,25 +43,33 @@ module Esirb
       SEGMENT_NAME.match?(name.to_s)
     end
 
-    attr_reader :client, :string
+    attr_reader :client
 
     def initialize(client:, segments: [])
       raise ArgumentError, "client is required" if client.nil?
 
       @client = client
       @segments = segments.freeze
-      @string = segments.map { |segment| "/#{segment}" }.join.freeze
+      @path = segments.map { |segment| "/#{segment}" }.join.freeze
       freeze
     end
 
+    # get, head, delete, post, put and patch send the request and return the Faraday response.
+    # params: become the query string, body: is sent as JSON, and headers: are added to the
+    # client's defaults, replacing any with the same name.
     VERBS.each do |verb|
       define_method verb do |params: nil, body: NO_BODY, headers: nil|
-        client.connection.public_send(verb, string) do |req|
+        client.connection.public_send(verb, to_s) do |req|
           req.params.update(params) if params
           req.body = body unless body.equal?(NO_BODY)
           req.headers.update(headers) if headers
         end
       end
+    end
+
+    # The path, e.g. "/characters/123/location".
+    def to_s
+      @path
     end
 
     # Adds a segment and its path params to a copy of this path, exactly as given. Use it for

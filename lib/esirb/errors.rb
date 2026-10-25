@@ -14,6 +14,7 @@ module Esirb
 
   # Raised for an error status from ESI. ESI's error bodies look like {"error" => "System not found"}.
   class ResponseError < Error
+    # The response's status, headers and parsed body, and the full Faraday response.
     attr_reader :status, :headers, :body, :response
 
     def self.for_status(status)
@@ -25,7 +26,7 @@ module Esirb
       @headers = env.response_headers
       @body = env.body
       @response = env.response
-      super("#{status} #{detail(env)} (#{env.method.to_s.upcase} #{env.url})")
+      super("#{status} #{error_message(env)} (#{env.method.to_s.upcase} #{env.url})")
     end
 
     # ESI's rate or error limit as of this response.
@@ -35,7 +36,7 @@ module Esirb
 
     private
 
-    def detail(env)
+    def error_message(env)
       message = body["error"] if body.is_a?(Hash)
       return message if message.is_a?(String) && !message.empty?
 
@@ -43,8 +44,8 @@ module Esirb
     end
   end
 
-  # Raised without sending the request, because ESI's error limit is nearly used up and its window
-  # hasn't reset yet. Only happens with a cache_store; see ErrorLimitGuard.
+  # Raised without sending the request, because ESI's error limit is nearly used up and the error
+  # limit window hasn't reset yet. Only happens with a cache_store; see ErrorLimitGuard.
   class ErrorLimitReached < Error
     # Seconds until ESI's error limit window resets.
     attr_reader :retry_after
@@ -60,7 +61,7 @@ module Esirb
   # twice in a row, so the pages can't be combined consistently. Trying again later usually works.
   class PagesChanged < Error; end
 
-  # Any 4xx status without its own class.
+  # Any other 4xx status, and the parent of the classes for specific 4xx statuses.
   class ClientError < ResponseError; end
 
   class BadRequest < ClientError; end
@@ -77,14 +78,14 @@ module Esirb
     end
   end
 
-  # 420: too many errors in the error limit's window. The limit is global, so every ESI route
+  # 420: too many errors in the error limit window. The limit is global, so every ESI route
   # returns 420 until it resets. Never retried.
   class ErrorLimited < RateLimited; end
 
   # 429: a rate limit group's tokens are used up. Retried when Retry-After is short.
   class TooManyRequests < RateLimited; end
 
-  # Any 5xx status.
+  # Any other 5xx status, and the parent of the classes for specific 5xx statuses.
   class ServerError < ResponseError; end
 
   # Usually transient on ESI's side, so esirb retries these (see the retries option).

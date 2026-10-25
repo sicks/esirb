@@ -13,6 +13,7 @@
 - Requests no longer send empty `If-Modified-Since` and `If-None-Match` headers.
 - The User-Agent is `esirb/<version> (+https://github.com/sicks/esirb)` instead of Faraday's.
 - Each chained call returns a new, frozen `Esirb::Path`, so a partial path can be reused without changing it.
+- `Esirb::Path#string` is now `Esirb::Path#to_s`, so a path works in string interpolation.
 - Path params are URL-encoded. `nil`, blank, `.`, `..` and anything other than a string, symbol or integer raise `ArgumentError`.
 - Keyword arguments in a path (`client.markets(1, type_id: 34)`) raise `ArgumentError`. Pass query params to the HTTP verb with `params:`.
 - Only lowercase names that don't start with `to_` become path segments. Other missing methods raise `NoMethodError` as usual, so conversions like `Array#flatten` work.

@@ -6,14 +6,14 @@ require_relative "rate_limit"
 
 module Esirb
   # Stops sending requests while ESI's error limit is nearly used up. Once that limit runs out,
-  # every ESI route returns 420 until its window resets, and repeatedly ignoring it can get an app
+  # every ESI route returns 420 until the error limit window resets, and repeatedly ignoring it can get an app
   # banned (https://developers.eveonline.com/docs/services/esi/rate-limiting/).
   #
   # The limit is counted per source IP, not per token, so its state is kept once per ESI host in
   # the cache store, where every client in every process sees it. Apps on several servers that
   # share one store will pause together, which errs on the side of sending less.
   class ErrorLimitGuard < Faraday::Middleware
-    # How long to pause after a 420 that doesn't say when the window resets. The window is a minute.
+    # How long to pause after a 420 that doesn't say when the error limit window resets. The window is a minute.
     DEFAULT_RESET = 60
 
     def initialize(app, store:, key:)
@@ -23,18 +23,18 @@ module Esirb
     end
 
     def call(env)
-      check
+      raise_if_paused
       response = @app.call(env)
-      record(response.status, response.headers) unless cached?(response.env)
+      record_error_limit(response.status, response.headers) unless cached?(response.env)
       response
     rescue ResponseError => e
-      record(e.status, e.headers)
+      record_error_limit(e.status, e.headers)
       raise
     end
 
     private
 
-    def check
+    def raise_if_paused
       state = @store.read(@key)
       return unless state
 
@@ -45,7 +45,7 @@ module Esirb
     end
 
     # Routes on the newer rate limit don't send error limit headers, and leave the state alone.
-    def record(status, headers)
+    def record_error_limit(status, headers)
       limit = RateLimit.new(headers)
       remaining = status == 420 ? 0 : limit.error_limit_remaining
       reset = limit.error_limit_reset || (DEFAULT_RESET if status == 420)

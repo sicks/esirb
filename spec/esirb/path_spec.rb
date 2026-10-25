@@ -6,27 +6,27 @@ RSpec.describe Esirb::Path do
 
   describe "building paths from method calls" do
     it "adds the method name as a segment" do
-      expect(path.alliances.string).to eq "/alliances"
+      expect(path.alliances.to_s).to eq "/alliances"
     end
 
     it "adds arguments as path params" do
-      expect(path.characters(123_456_789).string).to eq "/characters/123456789"
+      expect(path.characters(123_456_789).to_s).to eq "/characters/123456789"
     end
 
     it "chains segments" do
-      expect(path.characters(123_456_789).locations.string).to eq "/characters/123456789/locations"
+      expect(path.characters(123_456_789).locations.to_s).to eq "/characters/123456789/locations"
     end
 
     it "adds several path params in order" do
-      expect(path.route(123_456_789, 987_654_321).string).to eq "/route/123456789/987654321"
+      expect(path.route(123_456_789, 987_654_321).to_s).to eq "/route/123456789/987654321"
     end
 
     it "accepts string and symbol params" do
-      expect(path.killmails(1, "abc").ui(:x).string).to eq "/killmails/1/abc/ui/x"
+      expect(path.killmails(1, "abc").ui(:x).to_s).to eq "/killmails/1/abc/ui/x"
     end
 
     it "keeps `trace` as a segment now that it isn't an HTTP verb" do
-      expect(path.trace.string).to eq "/trace"
+      expect(path.trace.to_s).to eq "/trace"
     end
   end
 
@@ -40,23 +40,23 @@ RSpec.describe Esirb::Path do
     it "leaves the original path unchanged" do
       character.location
 
-      expect(character.string).to eq "/characters/1"
+      expect(character.to_s).to eq "/characters/1"
     end
 
     it "builds independent paths from a shared prefix" do
-      expect([character.location.string, character.skills.string])
+      expect([character.location.to_s, character.skills.to_s])
         .to eq ["/characters/1/location", "/characters/1/skills"]
     end
 
     it "is frozen", :aggregate_failures do
       expect(character).to be_frozen
-      expect(character.string).to be_frozen
+      expect(character.to_s).to be_frozen
     end
   end
 
   describe "path params" do
     it "URL-encodes reserved characters" do
-      expect(path.characters("1/../../x?y=1 z").string).to eq "/characters/1%2F..%2F..%2Fx%3Fy%3D1%20z"
+      expect(path.characters("1/../../x?y=1 z").to_s).to eq "/characters/1%2F..%2F..%2Fx%3Fy%3D1%20z"
     end
 
     [nil, "", ".", "..", 1.5, [1], { a: 1 }].each do |value|
@@ -72,29 +72,29 @@ RSpec.describe Esirb::Path do
 
   describe "hyphenated ESI segments" do
     it "are reached with the underscored method name" do
-      expect(path.characters(1).freelance_jobs(5).participation.string)
+      expect(path.characters(1).freelance_jobs(5).participation.to_s)
         .to eq "/characters/1/freelance-jobs/5/participation"
     end
 
     it "cover every listed segment" do
       described_class::HYPHENATED_SEGMENTS.each do |method_name, segment|
-        expect(path.public_send(method_name).string).to eq "/#{segment}"
+        expect(path.public_send(method_name).to_s).to eq "/#{segment}"
       end
     end
 
     it "leave underscored ESI segments alone" do
-      expect(path.universe.system_kills.string).to eq "/universe/system_kills"
+      expect(path.universe.system_kills.to_s).to eq "/universe/system_kills"
     end
   end
 
   describe "#segment" do
     it "adds segments exactly as given" do
-      expect(path.characters(1).segment("new-thing", 5).segment("freelance_jobs").string)
+      expect(path.characters(1).segment("new-thing", 5).segment("freelance_jobs").to_s)
         .to eq "/characters/1/new-thing/5/freelance_jobs"
     end
 
     it "encodes and validates like method calls", :aggregate_failures do
-      expect(path.segment("a b").string).to eq "/a%20b"
+      expect(path.segment("a b").to_s).to eq "/a%20b"
       expect { path.segment(nil) }.to raise_error(ArgumentError)
     end
   end

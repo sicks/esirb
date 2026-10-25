@@ -137,7 +137,7 @@ RSpec.describe Esirb::Client do
     it "no longer remembers the last path; `path` is just a segment" do
       client.alliances
 
-      expect(client.path.string).to eq "/path"
+      expect(client.path.to_s).to eq "/path"
     end
   end
 
@@ -169,7 +169,7 @@ RSpec.describe Esirb::Client do
     it "start a fresh path each time" do
       client.alliances
 
-      expect(client.corporations.string).to eq "/corporations"
+      expect(client.corporations.to_s).to eq "/corporations"
     end
 
     it "reports segment names in respond_to?", :aggregate_failures do
@@ -184,13 +184,13 @@ RSpec.describe Esirb::Client do
 
   describe "#segment" do
     it "starts a path with a segment exactly as given" do
-      expect(client.segment("new-thing", 7).string).to eq "/new-thing/7"
+      expect(client.segment("new-thing", 7).to_s).to eq "/new-thing/7"
     end
   end
 
   describe "hyphenated ESI segments" do
     it "are reached with the underscored method name" do
-      expect(client.freelance_jobs(7).string).to eq "/freelance-jobs/7"
+      expect(client.freelance_jobs(7).to_s).to eq "/freelance-jobs/7"
     end
   end
 end
