@@ -10,6 +10,9 @@ module Esirb
   #   Esirb::RateLimit.new(response).remaining # => 1195
   class RateLimit
     WINDOW_UNITS = { "s" => 1, "m" => 60, "h" => 60 * 60 }.freeze
+    # With fewer errors than this left in the error limit window, esirb stops retrying, and with a
+    # cache store stops sending requests: running out blocks every ESI route until the window resets.
+    ERROR_LIMIT_FLOOR = 20
     COUNT_HEADERS = %w[X-Ratelimit-Remaining X-Ratelimit-Used X-ESI-Error-Limit-Remain X-ESI-Error-Limit-Reset].freeze
 
     # group, limit (tokens per window), window (seconds), remaining and used (what this request
@@ -25,6 +28,12 @@ module Esirb
       @limit, @window = parse_limit(headers["X-Ratelimit-Limit"])
       @remaining, @used, @error_limit_remaining, @error_limit_reset =
         COUNT_HEADERS.map { |name| integer(headers[name]) }
+    end
+
+    # Whether the error limit is nearly used up. Routes on the newer rate limit don't send error
+    # limit headers, so this is false for them.
+    def error_limit_low?
+      !error_limit_remaining.nil? && error_limit_remaining < ERROR_LIMIT_FLOOR
     end
 
     private
