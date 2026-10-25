@@ -55,7 +55,10 @@ module Esirb
     private
 
     def build_connection(block)
-      Faraday.new(base_url, request: { timeout:, open_timeout: }.compact) do |c|
+      # ESI reads array params as repeated keys (categories=a&categories=b), not Faraday's default
+      # categories[]=a&categories[]=b. Checked live against /characters/{id}/search (MP-230).
+      request = { timeout:, open_timeout:, params_encoder: Faraday::FlatParamsEncoder }.compact
+      Faraday.new(base_url, request:) do |c|
         use_middleware(c)
         # Last, so app middleware sits closest to the network and sees real requests, not cache hits.
         [@faraday, block].compact.each { |hook| hook.call(c) }

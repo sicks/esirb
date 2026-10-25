@@ -253,6 +253,24 @@ RSpec.describe "Requests sent to ESI" do
       expect(requests.first.params).to eq("type_id" => "34", "page" => "2")
     end
 
+    # ESI reads arrays as repeated keys, the way its own API Explorer sends them (MP-230).
+    it "sends an Add Contacts request with path params, an array param and a body", :aggregate_failures do
+      requests = stub_endpoint(stubs, :post, "/characters/123/contacts")
+      params = { standing: 5.0, label_ids: [1, 2], watched: true }
+      client.characters(123).contacts.post(params:, body: [456, 789])
+
+      expect(requests.first.url.path).to eq "/characters/123/contacts"
+      expect(requests.first.url.query).to eq "label_ids=1&label_ids=2&standing=5.0&watched=true"
+      expect(requests.first.request_body).to eq "[456,789]"
+    end
+
+    it "sends a one-element array as a single key, without brackets" do
+      requests = stub_endpoint(stubs, :get, "/characters/123/search")
+      client.characters(123).search.get(params: { search: "Jita", categories: ["station"] })
+
+      expect(requests.first.url.query).to eq "categories=station&search=Jita"
+    end
+
     it "keeps params alongside headers and a body", :aggregate_failures do
       requests = stub_endpoint(stubs, :post, "/characters/1/contacts")
       client.characters(1).contacts.post(params: { standing: 5.0 }, body: [2], headers: { "X-Custom" => "1" })
