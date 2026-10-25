@@ -13,7 +13,3 @@ gem "rspec", "~> 3.0"
 gem "rubocop", "~> 1.21"
 gem "rubocop-rake", "~> 0.7"
 gem "rubocop-rspec", "~> 3.10"
-
-gem "faraday", "~> 2.14"
-
-gem "faraday-http-cache", "~> 2.7"
