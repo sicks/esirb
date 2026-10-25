@@ -1,8 +1,27 @@
 # Esirb
 
-Esirb is a light wrapper around Faraday for the purposes of interacting with Eve Online's Swagger API.
+Esirb is a light wrapper around Faraday for the purposes of interacting with EVE Online's ESI API.
 
 I wanted something low maintenance, so this gem makes a few assumptions to let you dynamically generate any path that might end up on the ESI.
+
+## Contents
+
+- [Installation](#installation)
+- [Usage](#usage)
+  - [Quick start](#quick-start)
+  - [Create a client](#create-a-client)
+  - [Build the path](#build-the-path-with-any-path-parameters)
+  - [Make the request](#make-the-request-with-any-query-parameters-or-body)
+  - [Pagination](#pagination)
+  - [Configuration](#configuration)
+  - [Customizing the connection](#customizing-the-connection)
+  - [Caching](#caching)
+  - [Errors](#errors)
+  - [Retries](#retries)
+  - [Rate limits](#rate-limits)
+- [Development](#development)
+- [Contributing](#contributing)
+- [License](#license)
 
 ## Installation
 
@@ -20,14 +39,23 @@ gem install esirb
 
 ## Usage
 
+### Quick start
+
+```ruby
+client = Esirb::Client.new
+alliance_ids = client.alliances.get.body # => [99000006, 99000008, ...]
+```
 
 ### Create a client
+
 ```ruby
 client = Esirb::Client.new
 ```
 
 A client holds no state from building paths or making requests, so one client can be shared between threads.
-##### Create a client with a token
+
+#### Create a client with a token
+
 ```ruby
 client = Esirb::Client.new(token: "...")
 ```
@@ -40,7 +68,8 @@ client = Esirb::Client.new(token: -> { character.access_token_refreshing_if_expi
 
 esirb doesn't refresh tokens itself: your app keeps the refresh token and does the refresh, and esirb only asks for the access token. If the callable returns `nil` or a blank string, the request raises `Esirb::Error` instead of being sent.
 
-##### Identify your app
+#### Identify your app
+
 CCP asks every ESI client to send a User-Agent with the app's name and a way to contact you. Pass yours as `user_agent:`, and esirb adds its own name after it:
 
 ```ruby
@@ -50,12 +79,11 @@ client.user_agent # => "mappy/1.2 (admin@example.com) esirb/0.4.0 (+https://gith
 
 ### Build the path, with any path parameters
 
-Treat ESI static paths as method names, and path parameters as the arguments for those methods. Chain these methods to build the path to the desired ESI endpoint.
+Treat ESI's static path segments as method names, and path parameters as the arguments for those methods. Chain these methods to build the path to the desired ESI route.
 
 ```ruby
-
-path = client.route(3000142, 30002187)
-path.to_s # => "/route/3000142/30002187"
+path = client.route(30000142, 30002187)
+path.to_s # => "/route/30000142/30002187"
 
 path = client.ui.autopilot.waypoint
 path.to_s # => "/ui/autopilot/waypoint"
@@ -88,24 +116,23 @@ client.characters(123456789).segment("new-thing", 42).to_s # => "/characters/123
 
 ### Make the request, with any query parameters or body
 
-Call an http verb, optionally passing `params`, `body` or `headers`.
+Call an HTTP verb on the path: `get`, `head`, `post`, `put`, `patch` or `delete`. Each returns a `Faraday::Response`, with JSON bodies already parsed.
 
 ```ruby
-resp = path.get # => #<Faraday::Response>
+client = Esirb::Client.new(token: -> { character.access_token }) # needs the esi-location.read_location.v1 scope
+resp = client.characters(123456789).location.get
 resp.status # => 200
-resp.body # => { "solar_system_id": 30000142 }
+resp.body   # => { "solar_system_id" => 30000142 }
+```
 
-# check ESI documentation to know whether you need to pass query parameters, or a body
-resp = path.post(params:, body:, headers:)
+Pass query parameters with `params:`, a body with `body:` (sent as JSON), and extra headers with `headers:`. The [API Explorer](https://developers.eveonline.com/api-explorer) lists what each route takes.
+
+```ruby
+client.markets(10000002).orders.get(params: { type_id: 34, order_type: "sell" })
+client.universe.names.post(body: [30000142, 30002187])
 ```
 
 Headers passed to a verb are added to the client's default headers, and replace a default with the same name.
-
-### All together now
-```ruby
-client = Esirb::Client.new
-list_of_alliance_ids = client.alliances.get.body # => [...]
-```
 
 ### Pagination
 
