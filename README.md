@@ -230,7 +230,15 @@ With `stop_at:`, `get_from_id` stops as soon as it reaches that ID and returns o
 
 ### Configuration
 
-Set defaults for every new client once, for example in a Rails initializer:
+In a Rails app, generate an initializer with each setting and a note on what it does:
+
+```bash
+bin/rails generate esirb:install
+```
+
+That writes `config/initializers/esirb.rb`, with your app's name in the User-Agent, esirb's current compatibility date pinned, and `Rails.cache` as the cache store. Edit the User-Agent's contact email before deploying.
+
+Outside Rails, or to write it yourself, set defaults for every new client once:
 
 ```ruby
 Esirb.configure do |config|
