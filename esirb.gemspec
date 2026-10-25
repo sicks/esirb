@@ -21,7 +21,7 @@ Gem::Specification.new do |spec|
   spec.metadata["bug_tracker_uri"] = "#{spec.homepage}/issues"
   spec.metadata["rubygems_mfa_required"] = "true"
 
-  spec.files = Dir["lib/**/*.rb", "sig/**/*.rbs", "README.md", "CHANGELOG.md", "LICENSE.txt"]
+  spec.files = Dir["lib/**/*.rb", "lib/generators/**/*.tt", "sig/**/*.rbs", "README.md", "CHANGELOG.md", "LICENSE.txt"]
   spec.require_paths = ["lib"]
 
   spec.add_dependency "faraday", "~> 2.14"

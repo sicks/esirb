@@ -1,0 +1,35 @@
+# frozen_string_literal: true
+
+# Settings for esirb, the client for EVE Online's ESI API. Options passed to Esirb::Client.new
+# override these for that client. See https://github.com/sicks/esirb#configuration
+Esirb.configure do |config|
+  # CCP asks every app using ESI to identify itself, ideally with a contact email. esirb adds its
+  # own name after this.
+  config.user_agent = "<%= app_name %>/1.0 (you@example.com)"
+
+  # The ESI behavior to use. A newer date can change response shapes, so check your code against
+  # it before moving it. Dates are listed at https://esi.evetech.net/meta/compatibility-dates
+  config.compatibility_date = "<%= defaults[:compatibility_date] %>"
+
+  # Where to cache ESI responses, shared by every client. Without a store nothing is cached, and
+  # esirb can't pause requests when ESI's error limit is nearly used up. Keep entries for longer
+  # than a day, so static data like universe types can be revalidated cheaply, e.g.
+  # ActiveSupport::Cache.lookup_store(:solid_cache_store, namespace: "esirb", expires_in: 2.days)
+  config.cache_store = Rails.cache
+
+  # Seconds to wait for a response, and to open the connection.
+  # config.timeout = <%= defaults[:timeout] %>
+  # config.open_timeout = <%= defaults[:open_timeout] %>
+
+  # Times to retry a 502, 503 or 504, a timeout, a connection failure or a short 429, on GET, HEAD,
+  # PUT and DELETE. 0 turns retries off.
+  # config.retries = <%= defaults[:retries] %>
+
+  # ESI's tenant and response language.
+  # config.tenant = "<%= defaults[:tenant] %>"
+  # config.language = "<%= defaults[:language] %>"
+
+  # Add Faraday middleware, change the adapter or set other connection options, e.g. logging in
+  # development. headers: false keeps access tokens out of the log.
+  # config.faraday = ->(f) { f.response :logger, Rails.logger, headers: false } if Rails.env.development?
+end
