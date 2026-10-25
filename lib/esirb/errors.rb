@@ -43,6 +43,19 @@ module Esirb
     end
   end
 
+  # Raised without sending the request, because ESI's error limit is nearly used up and its window
+  # hasn't reset yet. Only happens with a cache_store; see ErrorLimitGuard.
+  class ErrorLimitReached < Error
+    # Seconds until ESI's error limit window resets.
+    attr_reader :retry_after
+
+    def initialize(remaining:, retry_after:)
+      @retry_after = retry_after
+      super("ESI's error limit is nearly used up (#{remaining} errors left), " \
+            "so requests are paused for #{retry_after} more seconds")
+    end
+  end
+
   # Any 4xx status without its own class.
   class ClientError < ResponseError; end
 

@@ -7,6 +7,7 @@ require_relative "configuration"
 require_relative "compatibility_date"
 require_relative "raise_error"
 require_relative "retry"
+require_relative "error_limit_guard"
 require_relative "vary_by_authorization"
 
 module Esirb
@@ -70,9 +71,7 @@ module Esirb
       builder.request :authorization, "Bearer", access_token if token
       builder.headers.update(default_headers)
 
-      # Outside RaiseError, so it sees esirb's errors.
-      builder.use Retry, retries: retries if retries.positive?
-      builder.use RaiseError
+      use_error_handling(builder)
       builder.response :json
       # Inside the JSON parser, so the cache stores raw response bodies.
       use_cache(builder) if cache_store
@@ -132,6 +131,19 @@ module Esirb
       @compatibility_date = CompatibilityDate.parse(settings[:compatibility_date])
       app_user_agent = settings[:user_agent].to_s.strip
       @user_agent = app_user_agent.empty? ? USER_AGENT : "#{app_user_agent} #{USER_AGENT}"
+    end
+
+    # Retry sits outside RaiseError, so it sees esirb's errors. ErrorLimitGuard sits inside Retry,
+    # so it checks and records every attempt; it needs the shared cache store.
+    def use_error_handling(builder)
+      builder.use Retry, retries: retries if retries.positive?
+      builder.use ErrorLimitGuard, store: cache_store, key: error_limit_key if cache_store
+      builder.use RaiseError
+    end
+
+    # One per ESI host and tenant: ESI counts the error limit per source IP, not per token.
+    def error_limit_key
+      "esirb:error-limit:#{base_url}:#{tenant}"
     end
 
     def default_headers

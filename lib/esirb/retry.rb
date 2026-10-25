@@ -13,9 +13,6 @@ module Esirb
     METHODS = %i[delete get head options put].freeze
     # Longest Retry-After worth waiting for, in seconds. Anything longer is raised for the app to handle.
     MAX_WAIT = 10
-    # With fewer errors than this left in ESI's error limit window, nothing is retried: running out
-    # blocks every ESI route until the window resets, and each failed retry is another error.
-    ERROR_LIMIT_FLOOR = 20
 
     def self.pause(seconds)
       sleep(seconds)
@@ -53,6 +50,11 @@ module Esirb
       attempt < @retries && METHODS.include?(env.method) && !error_limit_low?(error)
     end
 
+    # Each failed retry is another error, so stop when the error limit is nearly used up.
+    def error_limit_low?(error)
+      error.is_a?(ResponseError) && error.rate_limit.error_limit_low?
+    end
+
     # About 0.5s, then 1s, then 2s..., plus up to 50% so many clients don't retry in step.
     def backoff(attempt)
       0.5 * (2**attempt) * (1 + (rand * 0.5))
@@ -66,12 +68,6 @@ module Esirb
     def retry_after(error)
       seconds = Float(error.headers["Retry-After"], exception: false) if retry_after?(error)
       seconds if seconds && seconds <= MAX_WAIT
-    end
-
-    # Routes on the newer rate limit don't send error limit headers, so this is false for them.
-    def error_limit_low?(error)
-      remaining = error.rate_limit.error_limit_remaining if error.is_a?(ResponseError)
-      !remaining.nil? && remaining < ERROR_LIMIT_FLOOR
     end
   end
 end

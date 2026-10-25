@@ -198,6 +198,7 @@ end
 | `Esirb::ServerError` | Any other 5xx, and the parent of the three classes above |
 | `Esirb::ConnectionFailed` | The connection to ESI failed, including TLS errors and timeouts while connecting |
 | `Esirb::TimeoutError` | ESI connected but didn't answer within `timeout` |
+| `Esirb::ErrorLimitReached` | Raised *without sending the request*, while ESI's error limit is nearly used up (needs a `cache_store`; see [Rate limits](#rate-limits)). `retry_after` gives the seconds until it resets. |
 
 Everything esirb raises is an `Esirb::Error`. When an error status is a normal answer, rescue its class. For example, ESI returns 404 for a character's fleet when they aren't in one:
 
@@ -247,6 +248,20 @@ end
 ```
 
 Values a route doesn't send are `nil`. Errors cost more than successful requests (5 tokens for a 4xx against 2 for a 2xx), so avoid repeating requests that fail. CCP also recommends slowing down as `remaining` nears zero, and staggering scheduled work rather than running it all at the same minute.
+
+#### Pausing before the error limit runs out
+
+ESI's older error limit allows about 100 error responses a minute. Once it's used up, *every* ESI route returns 420 until the window resets, and repeatedly ignoring it can get an app banned. With a `cache_store`, esirb keeps track of it for you: when a response shows fewer than 20 errors left, every client sharing that store stops sending requests until the window resets, and raises `Esirb::ErrorLimitReached` instead.
+
+```ruby
+begin
+  client.universe.systems(30000142).get
+rescue Esirb::ErrorLimitReached => e
+  e.retry_after # => 37, seconds until ESI's error limit resets
+end
+```
+
+ESI counts the error limit per IP address, so esirb keeps one count per ESI host and tenant, shared by every client and process using the store. If several servers with different IP addresses share one store, an error burst on one pauses the others too, which errs on the side of sending less.
 
 ## Development
 
