@@ -1,7 +1,0 @@
-# Offenses left in place on purpose because other ESIrb tickets rework this code.
-# Remove each entry when its ticket lands.
-
-# MP-224 decides on rubygems_mfa_required along with the other gemspec cleanup.
-Gemspec/RequireMFA:
-  Exclude:
-    - "esirb.gemspec"

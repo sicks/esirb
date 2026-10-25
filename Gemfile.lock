@@ -101,8 +101,6 @@ PLATFORMS
 
 DEPENDENCIES
   esirb!
-  faraday (~> 2.14)
-  faraday-http-cache (~> 2.7)
   irb
   rake (~> 13.0)
   rspec (~> 3.0)
