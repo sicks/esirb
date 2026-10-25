@@ -57,7 +57,7 @@ module Esirb
 
     def build_connection(block)
       # ESI reads array params as repeated keys (categories=a&categories=b), not Faraday's default
-      # categories[]=a&categories[]=b. Checked live against /characters/{id}/search (MP-230).
+      # categories[]=a&categories[]=b.
       request = { timeout:, open_timeout:, params_encoder: Faraday::FlatParamsEncoder }.compact
       Faraday.new(base_url, request:) do |c|
         use_middleware(c)
