@@ -136,7 +136,7 @@ Headers passed to a verb are added to the client's default headers, and replace 
 
 ### Pagination
 
-ESI splits long lists into pages, using [one of three styles](https://developers.eveonline.com/docs/services/esi/pagination/x-pages/) depending on the route. You can tell which from the route's query parameters in ESI's API Explorer:
+ESI splits long lists into pages, using one of three styles depending on the route. You can tell which from the route's query parameters in ESI's API Explorer:
 
 | The route takes | Style | Use | Typical routes |
 |---|---|---|---|
@@ -146,7 +146,7 @@ ESI splits long lists into pages, using [one of three styles](https://developers
 
 All three send their requests one at a time, never in parallel. Each request goes through esirb's cache, retries and error-limit guard like any other, and keeps the `params:` and `headers:` you pass. If any request fails, the error is raised and nothing is returned.
 
-#### `get_all_pages`: numbered pages
+#### `get_all_pages`: X-Pages ([ESI docs](https://developers.eveonline.com/docs/services/esi/pagination/x-pages/))
 
 ```ruby
 orders = client.markets(10000002).orders.get_all_pages(params: { type_id: 34 })
@@ -173,7 +173,7 @@ end
 
 Every page of one list should have the same `Last-Modified`. A different one means ESI refreshed the data partway through, so the pages would mix old and new records. `get_all_pages` then starts over from page 1 once, and raises `Esirb::PagesChanged` if it happens again. Fetching the whole list takes as many requests as there are pages, or up to twice that if it has to start over.
 
-#### `get_by_cursor`: before and after cursors
+#### `get_by_cursor`: Cursor ([ESI docs](https://developers.eveonline.com/docs/services/esi/pagination/cursor-based/))
 
 These responses aren't a plain list. They're an object holding the records under a key that depends on the route (`freelance_jobs`, `projects`, `listings`...), plus a `cursor` with two values: `before`, pointing at older records, and `after`, pointing at newer ones. `get_by_cursor` finds the records' key for you. There are two ways to call it.
 
@@ -230,7 +230,7 @@ end
 
 `after` and `before` values stay valid for days, according to CCP. Pass them back exactly as you got them, without trying to decode them. A record can show up on more than one page, for example when it changed while the pages were being fetched. `get_by_cursor` returns each record once, matched by its `id`: when following `before` toward older records it keeps the copy it already had, and when following `after` toward newer records it keeps the newest copy.
 
-#### `get_from_id`: newest to oldest
+#### `get_from_id`: From-ID ([ESI docs](https://developers.eveonline.com/docs/services/esi/pagination/from-id/))
 
 ```ruby
 transactions = client.characters(123456789).wallet.transactions
