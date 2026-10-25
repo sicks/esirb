@@ -45,7 +45,7 @@ CCP asks every ESI client to send a User-Agent with the app's name and a way to 
 
 ```ruby
 client = Esirb::Client.new(user_agent: "mappy/1.2 (admin@example.com)")
-client.user_agent # => "mappy/1.2 (admin@example.com) esirb/0.3.0 (+https://github.com/sicks/esirb)"
+client.user_agent # => "mappy/1.2 (admin@example.com) esirb/0.4.0 (+https://github.com/sicks/esirb)"
 ```
 
 ### Build the path, with any path parameters
@@ -92,7 +92,7 @@ Call an http verb, optionally passing `params`, `body` or `headers`.
 
 ```ruby
 resp = path.get # => #<Faraday::Response>
-resp.status # => 204
+resp.status # => 200
 resp.body # => { "solar_system_id": 30000142 }
 
 # check ESI documentation to know whether you need to pass query parameters, or a body
@@ -265,6 +265,10 @@ Options passed to `Esirb::Client.new` override these for that client:
 
 Setting `tenant` or `language` to `nil` leaves that header out. `token` is set per client only.
 
+#### Compatibility dates
+
+ESI changes a route's responses only under a new compatibility date, and a request without a date gets ESI's oldest behavior, so esirb always sends one. New fields and enum values can still appear within a date, so don't fail on ones you don't recognize. To move to a newer date, check ESI's changes since your current one against your code, then set `compatibility_date`. A new esirb version can move the default date; the CHANGELOG says when.
+
 ### Customizing the connection
 
 esirb uses [Faraday](https://lostisland.github.io/faraday/). To add middleware, change the adapter or set other connection options, give `Esirb.configure` a `faraday` callable, or pass a block to a client. Both receive the Faraday connection builder after esirb has set up its own middleware:
@@ -282,6 +286,8 @@ client = Esirb::Client.new { |f| f.adapter :net_http_persistent }
 ### Caching
 
 esirb caches responses only when you give it a `cache_store`, usually once in `Esirb.configure` so every client shares it. Any object with `read`, `write` and `delete` works, such as `Rails.cache` or another `ActiveSupport::Cache` store.
+
+Without a `cache_store`, every request goes to ESI, even when the last response is still fresh. CCP asks apps not to request data again before its `Expires` time or work around ESI's cache, and doing that can get an app banned, so set a store in production. The store also lets esirb [pause before the error limit runs out](#pausing-before-the-error-limit-runs-out).
 
 ```ruby
 Esirb.configure do |config|
@@ -328,6 +334,8 @@ end
 | `Esirb::ConnectionFailed` | The connection to ESI failed, including TLS errors and timeouts while connecting |
 | `Esirb::TimeoutError` | ESI connected but didn't answer within `timeout` |
 | `Esirb::ErrorLimitReached` | Raised *without sending the request*, while ESI's error limit is nearly used up (needs a `cache_store`; see [Rate limits](#rate-limits)). `retry_after` gives the seconds until it resets. |
+
+Error responses aren't free: a 4xx costs 5 rate limit tokens and counts toward ESI's [error limit](https://developers.eveonline.com/docs/services/esi/rate-limiting/), so don't keep repeating a request that fails.
 
 Everything esirb raises is an `Esirb::Error`. When an error status is a normal answer, rescue its class. For example, ESI returns 404 for a character's fleet when they aren't in one:
 
@@ -396,11 +404,13 @@ ESI counts the error limit per IP address, so esirb keeps one count per ESI host
 
 After checking out the repo, run `bin/setup` to install dependencies. Then, run `rake spec` to run the tests. You can also run `bin/console` for an interactive prompt that will allow you to experiment.
 
+After moving esirb's default compatibility date, run `bundle exec rake esi:check_segments` to compare esirb's list of hyphenated segments with ESI's OpenAPI spec.
+
 To install this gem onto your local machine, run `bundle exec rake install`. To release a new version, update the version number in `version.rb`, and then run `bundle exec rake release`, which will create a git tag for the version, push git commits and the created tag, and push the `.gem` file to [rubygems.org](https://rubygems.org).
 
 ## Contributing
 
-Bug reports and pull requests are welcome on GitHub at https://github.com/[USERNAME]/esirb.
+Bug reports and pull requests are welcome on GitHub at https://github.com/sicks/esirb.
 
 ## License
 
